@@ -41,9 +41,25 @@ To run the tests, check your test coverage, and generate an HTML coverage report
 
     uv run pytest
 
-### Live reloading and Sass CSS compilation
+### Tailwind CSS
 
-Moved to [Live reloading and SASS compilation](https://cookiecutter-django.readthedocs.io/en/latest/2-local-development/developing-locally.html#using-webpack-or-gulp).
+Install the Node dependencies:
+
+    npm install
+
+Build the Django-served stylesheet:
+
+    npm run build:css
+
+Watch and rebuild during frontend work:
+
+    npm run watch:css
+
+The Tailwind and DaisyUI source stylesheet is `vestigo/static/src/project.css`. The compiled output is `vestigo/static/css/project.css`, which is already linked from the base template.
+
+### Live reloading
+
+Moved to [Live reloading](https://cookiecutter-django.readthedocs.io/en/latest/2-local-development/developing-locally.html#using-webpack-or-gulp).
 
 ### Celery
 

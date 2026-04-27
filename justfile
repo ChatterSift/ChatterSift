@@ -36,3 +36,11 @@ logs *args:
 # manage: Executes `manage.py` command.
 manage +args:
     @docker compose run --rm django python ./manage.py {{args}}
+
+# css: Build Tailwind CSS.
+css:
+    @npm run build:css
+
+# css-watch: Rebuild Tailwind CSS when templates or source styles change.
+css-watch:
+    @npm run watch:css
