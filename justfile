@@ -44,3 +44,10 @@ css:
 # css-watch: Rebuild Tailwind CSS when templates or source styles change.
 css-watch:
     @npm run watch:css
+
+# pre-commit: Run the repo's lint, type, and template checks locally.
+pre-commit:
+    @uv run ruff check . --fix
+    @uv run ruff format .
+    @uv run ty check
+    @uv run djlint .

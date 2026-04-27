@@ -37,6 +37,14 @@ repos:
       # Formatter
       - id: ruff-format
 
+  - repo: local
+    hooks:
+      - id: ty-check
+        name: ty check
+        entry: uv run ty check
+        language: system
+        types: [python]
+
   - repo: https://github.com/tox-dev/pyproject-fmt
     rev: v2.21.1
     hooks:
