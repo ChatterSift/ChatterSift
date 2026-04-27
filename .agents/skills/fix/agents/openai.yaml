@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fix"
+  short_description: "Run and repair project quality checks"
+  default_prompt: "Use $fix to run quality tools and fix any detected issues."
