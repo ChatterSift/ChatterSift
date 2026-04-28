@@ -1,1 +1,299 @@
 {% extends "base.html" %}
+
+{% load static i18n %}
+
+{% block title %}
+  Chattersift - Open-Source Reddit Keyword Monitoring
+{% endblock title %}
+{% block meta %}
+  <meta name="description"
+        content="Monitor Reddit for keywords that matter to your business, project, or community. Open-source, self-hostable, and built with Django." />
+  <link rel="canonical"
+        href="{{ request.scheme }}://{{ request.get_host }}{% url 'home' %}" />
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title"
+        content="Chattersift - Open-Source Reddit Keyword Monitoring" />
+  <meta property="og:description"
+        content="Monitor Reddit for keywords that matter. Get instant alerts when conversations match your interests." />
+  <meta property="og:url"
+        content="{{ request.scheme }}://{{ request.get_host }}{% url 'home' %}" />
+  <meta property="og:site_name" content="Chattersift" />
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title"
+        content="Chattersift - Open-Source Reddit Keyword Monitoring" />
+  <meta name="twitter:description"
+        content="Monitor Reddit for keywords that matter. Get instant alerts when conversations match your interests." />
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Chattersift",
+      "description": "Open-source Reddit keyword monitoring tool. Track conversations, match keywords, and get instant alerts.",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "license": "https://opensource.org/licenses/MIT"
+    }
+  </script>
+{% endblock meta %}
+{% block body %}
+  <!-- Landing Navbar -->
+  <nav class="navbar bg-base-100/80 backdrop-blur-sm sticky top-0 z-50 border-b border-base-300 px-4">
+    <div class="navbar-start">
+      <a href="{% url 'home' %}"
+         class="btn btn-ghost text-xl font-mono font-bold tracking-tight">chattersift</a>
+    </div>
+    <div class="navbar-end gap-2">
+      <a href="https://github.com/ChatterSift"
+         class="btn btn-ghost btn-sm gap-2"
+         target="_blank"
+         rel="noopener noreferrer">
+        <svg class="w-5 h-5"
+             fill="currentColor"
+             viewBox="0 0 24 24"
+             aria-hidden="true">
+          <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+        </svg>
+        GitHub
+      </a>
+      {% if request.user.is_authenticated %}
+        <a href="{% url 'users:detail' request.user.pk %}"
+           class="btn btn-ghost btn-sm">{% translate "My Profile" %}</a>
+        <a href="{% url 'account_logout' %}" class="btn btn-ghost btn-sm">{% translate "Sign Out" %}</a>
+      {% else %}
+        <a href="{% url 'account_login' %}" class="btn btn-ghost btn-sm">{% translate "Sign In" %}</a>
+        {% if ACCOUNT_ALLOW_REGISTRATION %}
+          <a href="{% url 'account_signup' %}" class="btn btn-primary btn-sm">{% translate "Sign Up" %}</a>
+        {% endif %}
+      {% endif %}
+    </div>
+  </nav>
+  <!-- Hero -->
+  <section class="relative overflow-hidden">
+    <div class="absolute inset-0 landing-dot-grid opacity-30 pointer-events-none"
+         aria-hidden="true"></div>
+    <div class="relative max-w-6xl mx-auto px-6 py-24 lg:py-32">
+      <div class="grid lg:grid-cols-2 gap-16 items-center">
+        <!-- Copy -->
+        <div class="space-y-8 landing-fade-in">
+          <div>
+            <span class="inline-block font-mono text-sm text-primary font-semibold tracking-wide uppercase mb-4">
+              Open-source Reddit monitoring
+            </span>
+            <h1 class="text-4xl lg:text-5xl font-bold leading-tight tracking-tight">
+              Never miss a Reddit conversation that
+              <span class="text-primary">matters</span>
+            </h1>
+          </div>
+          <p class="text-lg text-base-content/70 leading-relaxed max-w-lg">
+            Chattersift watches Reddit for the keywords you care about and alerts
+            you the moment they appear. Self-hosted, open-source, and built for
+            teams who want to stay ahead of the conversation.
+          </p>
+          <div class="flex flex-wrap gap-4">
+            {% if ACCOUNT_ALLOW_REGISTRATION %}
+              <a href="{% url 'account_signup' %}" class="btn btn-primary">Get started</a>
+            {% endif %}
+            <a href="https://github.com/ChatterSift"
+               class="btn btn-ghost border border-base-300 gap-2"
+               target="_blank"
+               rel="noopener noreferrer">
+              <svg class="w-5 h-5"
+                   fill="currentColor"
+                   viewBox="0 0 24 24"
+                   aria-hidden="true">
+                <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+              </svg>
+              View on GitHub
+            </a>
+          </div>
+        </div>
+        <!-- Terminal visual -->
+        <div class="landing-fade-in [animation-delay:0.2s]">
+          <div class="bg-neutral rounded-lg shadow-2xl overflow-hidden font-mono text-sm border border-base-content/10">
+            <!-- Terminal header -->
+            <div class="flex items-center gap-2 px-4 py-3 border-b border-white/10">
+              <div class="w-3 h-3 rounded-full bg-error/80"></div>
+              <div class="w-3 h-3 rounded-full bg-warning/80"></div>
+              <div class="w-3 h-3 rounded-full bg-success/80"></div>
+              <span class="ml-2 text-neutral-content/50 text-xs">chattersift</span>
+            </div>
+            <!-- Terminal body -->
+            <div class="p-5 space-y-3 text-neutral-content/90">
+              <div class="text-neutral-content/50">
+                <span class="text-primary">$</span>
+                Monitoring
+                <span class="text-accent">r/webdev</span>,
+                <span class="text-accent">r/python</span>,
+                <span class="text-accent">r/django</span>
+                <span class="terminal-cursor text-primary">|</span>
+              </div>
+              <div class="border-t border-white/5 pt-3"></div>
+              <div>
+                <span class="text-success">✓</span>
+                Match: <span class="text-primary">"django deployment"</span>
+                <div class="text-neutral-content/40 ml-5">r/webdev · 2m ago</div>
+              </div>
+              <div>
+                <span class="text-success">✓</span>
+                Match: <span class="text-primary">"celery best practices"</span>
+                <div class="text-neutral-content/40 ml-5">r/python · 5m ago</div>
+              </div>
+              <div>
+                <span class="text-success">✓</span>
+                Match: <span class="text-primary">"async task queue"</span>
+                <div class="text-neutral-content/40 ml-5">r/django · 12m ago</div>
+              </div>
+              <div class="border-t border-white/5 pt-3">
+                <span class="text-accent">→</span> 3 alerts delivered
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- How it works -->
+  <section class="bg-base-200 border-y border-base-300">
+    <div class="max-w-6xl mx-auto px-6 py-20">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl font-bold tracking-tight">How it works</h2>
+        <p class="mt-3 text-base-content/60">Three steps to never miss a mention again.</p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-12">
+        <div class="text-center space-y-4">
+          <div class="w-12 h-12 rounded-full bg-primary text-primary-content flex items-center justify-center font-mono font-bold text-lg mx-auto">
+            1
+          </div>
+          <h3 class="text-lg font-semibold">Define your keywords</h3>
+          <p class="text-base-content/60 leading-relaxed">
+            Set up the terms, phrases, or patterns you want to track across
+            Reddit.
+          </p>
+        </div>
+        <div class="text-center space-y-4">
+          <div class="w-12 h-12 rounded-full bg-primary text-primary-content flex items-center justify-center font-mono font-bold text-lg mx-auto">
+            2
+          </div>
+          <h3 class="text-lg font-semibold">Pick your subreddits</h3>
+          <p class="text-base-content/60 leading-relaxed">
+            Choose the communities that matter. Chattersift monitors them
+            continuously in the background.
+          </p>
+        </div>
+        <div class="text-center space-y-4">
+          <div class="w-12 h-12 rounded-full bg-primary text-primary-content flex items-center justify-center font-mono font-bold text-lg mx-auto">
+            3
+          </div>
+          <h3 class="text-lg font-semibold">Get alerted instantly</h3>
+          <p class="text-base-content/60 leading-relaxed">
+            Receive notifications the moment a new post or comment matches your
+            keywords.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- Features -->
+  <section>
+    <div class="max-w-6xl mx-auto px-6 py-20">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl font-bold tracking-tight">Built for the job</h2>
+        <p class="mt-3 text-base-content/60">Everything you need, nothing you don't.</p>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="card border-l-4 border-l-primary border border-base-300 bg-base-100">
+          <div class="card-body">
+            <h3 class="card-title text-base">Keyword matching</h3>
+            <p class="text-base-content/60 text-sm">Flexible pattern matching across post titles, bodies, and comments.</p>
+          </div>
+        </div>
+        <div class="card border-l-4 border-l-accent border border-base-300 bg-base-100">
+          <div class="card-body">
+            <h3 class="card-title text-base">Multi-subreddit</h3>
+            <p class="text-base-content/60 text-sm">
+              Monitor any number of subreddits simultaneously with a single
+              configuration.
+            </p>
+          </div>
+        </div>
+        <div class="card border-l-4 border-l-success border border-base-300 bg-base-100">
+          <div class="card-body">
+            <h3 class="card-title text-base">Instant alerts</h3>
+            <p class="text-base-content/60 text-sm">
+              Get notified the moment keywords are detected. No polling, no
+              delays.
+            </p>
+          </div>
+        </div>
+        <div class="card border-l-4 border-l-info border border-base-300 bg-base-100">
+          <div class="card-body">
+            <h3 class="card-title text-base">Self-hosted</h3>
+            <p class="text-base-content/60 text-sm">
+              Run it on your own infrastructure. Your data stays on your
+              servers.
+            </p>
+          </div>
+        </div>
+        <div class="card border-l-4 border-l-warning border border-base-300 bg-base-100">
+          <div class="card-body">
+            <h3 class="card-title text-base">Background processing</h3>
+            <p class="text-base-content/60 text-sm">
+              Celery-powered task queue for reliable, scalable monitoring around
+              the clock.
+            </p>
+          </div>
+        </div>
+        <div class="card border-l-4 border-l-secondary border border-base-300 bg-base-100">
+          <div class="card-body">
+            <h3 class="card-title text-base">Open source</h3>
+            <p class="text-base-content/60 text-sm">MIT licensed. Inspect the code, extend it, contribute back.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- Open source callout -->
+  <section class="bg-neutral text-neutral-content">
+    <div class="max-w-4xl mx-auto px-6 py-20 text-center space-y-6">
+      <h2 class="text-3xl font-bold tracking-tight">Built in the open</h2>
+      <p class="text-neutral-content/70 leading-relaxed max-w-2xl mx-auto">
+        Chattersift is MIT-licensed and open source. Run it yourself, read every
+        line of code, and contribute to make it better. No vendor lock-in, no
+        black boxes.
+      </p>
+      <div class="flex flex-wrap justify-center gap-4 pt-4">
+        <a href="https://github.com/ChatterSift"
+           class="btn btn-primary gap-2"
+           target="_blank"
+           rel="noopener noreferrer">
+          <svg class="w-5 h-5"
+               fill="currentColor"
+               viewBox="0 0 24 24"
+               aria-hidden="true">
+            <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+          </svg>
+          Star on GitHub
+        </a>
+        <a href="https://github.com/ChatterSift#readme"
+           class="btn btn-ghost text-neutral-content border border-neutral-content/20 btn-sm"
+           target="_blank"
+           rel="noopener noreferrer">Read the docs</a>
+      </div>
+    </div>
+  </section>
+  <!-- Footer -->
+  <footer class="border-t border-base-300 bg-base-200">
+    <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-base-content/50">
+      <span class="font-mono">chattersift</span>
+      <span>MIT License</span>
+    </div>
+  </footer>
+{% endblock body %}

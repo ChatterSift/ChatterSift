@@ -66,16 +66,10 @@
   --noise: 0;
 }
 
-.alert-debug {
-  color: black;
-  background-color: white;
-  border-color: #d6e9c6;
-}
-
-.alert-error {
-  color: #b94a48;
-  background-color: #f2dede;
-  border-color: #eed3d7;
+/* Typography: DM Sans (body) + JetBrains Mono (code/accents) */
+@theme {
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 /* Remove double focus outline and add primary border on focus */
@@ -84,4 +78,36 @@
 .select:focus {
   outline: none;
   border-color: var(--color-primary);
+}
+
+/* Landing page: dot grid background */
+.landing-dot-grid {
+  background-image: radial-gradient(circle, oklch(70% 0.02 260) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Landing page: fade-in animation */
+@keyframes landing-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-fade-in {
+  animation: landing-fade-in 0.6s ease-out both;
+}
+
+/* Landing page: terminal blinking cursor */
+@keyframes terminal-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.terminal-cursor {
+  animation: terminal-blink 1s step-end infinite;
 }

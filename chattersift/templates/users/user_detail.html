@@ -7,25 +7,14 @@
   {{ object.name }}
 {% endblock title %}
 {% block content %}
-  <div class="container">
-    <div class="row">
-      <div class="col-sm-12">
-        <h2>{{ object.name }}</h2>
-      </div>
-    </div>
+  <div class="space-y-6">
+    <h2 class="text-2xl font-bold">{{ object.name }}</h2>
     {% if object == request.user %}
-      <!-- Action buttons -->
-      <div class="row">
-        <div class="col-sm-12">
-          <a class="btn btn-primary" href="{% url 'users:update' %}" role="button">My Info</a>
-          <a class="btn btn-primary"
-             href="{% url 'account_email' %}"
-             role="button">E-Mail</a>
-          <a class="btn btn-primary" href="{% url 'mfa_index' %}" role="button">MFA</a>
-          <!-- Your Stuff: Custom user template urls -->
-        </div>
+      <div class="flex flex-wrap gap-3">
+        <a class="btn btn-primary btn-sm" href="{% url 'users:update' %}">My Info</a>
+        <a class="btn btn-primary btn-sm" href="{% url 'account_email' %}">E-Mail</a>
+        <a class="btn btn-primary btn-sm" href="{% url 'mfa_index' %}">MFA</a>
       </div>
-      <!-- End Action buttons -->
     {% endif %}
   </div>
 {% endblock content %}

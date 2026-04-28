@@ -1,7 +1,7 @@
 {% load allauth %}
 
 <section>
-  <div class="card mb-4">
+  <div class="card border border-base-300 mb-4">
     <div class="card-body">
       <h2 class="card-title">
         {% slot title %}
@@ -10,7 +10,7 @@
     {% slot body %}
   {% endslot %}
   {% if slots.actions %}
-    <ul>
+    <ul class="mt-4 space-y-1">
       {% for action in slots.actions %}<li>{{ action }}</li>{% endfor %}
     </ul>
   {% endif %}
