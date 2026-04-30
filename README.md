@@ -57,6 +57,11 @@ Watch and rebuild during frontend work:
 
 The Tailwind and DaisyUI source stylesheet is `chattersift/static/src/project.css`. The compiled output is `chattersift/static/css/project.css`, which is already linked from the base template.
 
+### Local workflows
+
+Use `just shell` to run Chattersift from the local shell on port 8000. Use `just up` to run it through Docker.
+Both workflows build CSS and run `collectstatic`; the shell workflow also runs migrations before starting Django.
+
 ### Live reloading
 
 Moved to [Live reloading](https://cookiecutter-django.readthedocs.io/en/latest/2-local-development/developing-locally.html#using-webpack-or-gulp).

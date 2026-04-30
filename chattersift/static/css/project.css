@@ -2477,6 +2477,9 @@
       --btn-fg: var(--color-warning-content);
     }
   }
+  .\[animation-delay\:0\.2s\] {
+    animation-delay: 0.2s;
+  }
   .radio-primary {
     @layer daisyui.l1.l2 {
       --input-color: var(--color-primary);
