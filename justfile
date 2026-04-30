@@ -12,36 +12,82 @@ load-production-env := "set -a; . ./.envs/.production/.django; . ./.envs/.produc
 default:
     @just --list
 
-# build: Build python image.
-build *args:
+# build: Build Docker images. Use `local` or `production`.
+build mode="local" *args:
     @echo "Building python image..."
-    @{{load-local-postgres}} docker compose build {{args}}
+    @if [ "{{mode}}" = "local" ]; then \
+        {{load-local-postgres}} docker compose -f docker-compose.local.yml build {{args}}; \
+    elif [ "{{mode}}" = "production" ]; then \
+        {{load-production-env}} docker compose -f docker-compose.production.yml build {{args}}; \
+    else \
+        echo "Unknown mode '{{mode}}'. Use 'local' or 'production'."; \
+        exit 2; \
+    fi
 
-# up: Start up containers.
-up:
+# up: Start Docker containers. Use `local` or `production`.
+up mode="local":
     @npm install
     @npm run build:css
-    @echo "Starting up containers..."
-    @{{load-local-postgres}} docker compose up -d --remove-orphans
-    @{{load-local-postgres}} docker compose run --rm django python ./manage.py collectstatic --noinput
+    @if [ "{{mode}}" = "local" ]; then \
+        echo "Starting local Docker containers..." && \
+        {{load-local-postgres}} docker compose -f docker-compose.local.yml up -d --remove-orphans && \
+        {{load-local-postgres}} docker compose -f docker-compose.local.yml run --rm django python ./manage.py collectstatic --noinput; \
+    elif [ "{{mode}}" = "production" ]; then \
+        echo "Starting production Docker containers..." && \
+        {{load-production-env}} docker compose -f docker-compose.production.yml up -d --build --remove-orphans; \
+    else \
+        echo "Unknown mode '{{mode}}'. Use 'local' or 'production'."; \
+        exit 2; \
+    fi
 
-# down: Stop containers.
-down:
-    @echo "Stopping containers..."
-    @docker compose down
+# down: Stop Docker containers. Use `local` or `production`.
+down mode="local":
+    @if [ "{{mode}}" = "local" ]; then \
+        echo "Stopping local Docker containers..." && \
+        docker compose -f docker-compose.local.yml down; \
+    elif [ "{{mode}}" = "production" ]; then \
+        echo "Stopping production Docker containers..." && \
+        docker compose -f docker-compose.production.yml down; \
+    else \
+        echo "Unknown mode '{{mode}}'. Use 'local' or 'production'."; \
+        exit 2; \
+    fi
 
 # prune: Remove containers and their volumes.
-prune *args:
-    @echo "Killing containers and removing volumes..."
-    @docker compose down -v {{args}}
+prune mode="local" *args:
+    @if [ "{{mode}}" = "local" ]; then \
+        echo "Killing local containers and removing volumes..." && \
+        docker compose -f docker-compose.local.yml down -v {{args}}; \
+    elif [ "{{mode}}" = "production" ]; then \
+        echo "Killing production containers and removing volumes..." && \
+        docker compose -f docker-compose.production.yml down -v {{args}}; \
+    else \
+        echo "Unknown mode '{{mode}}'. Use 'local' or 'production'."; \
+        exit 2; \
+    fi
 
 # logs: View container logs
-logs *args:
-    @docker compose logs -f {{args}}
+logs mode="local" *args:
+    @if [ "{{mode}}" = "local" ]; then \
+        docker compose -f docker-compose.local.yml logs -f {{args}}; \
+    elif [ "{{mode}}" = "production" ]; then \
+        docker compose -f docker-compose.production.yml logs -f {{args}}; \
+    else \
+        echo "Unknown mode '{{mode}}'. Use 'local' or 'production'."; \
+        exit 2; \
+    fi
 
-# manage: Executes `manage.py` command.
+# manage: Execute `manage.py` in local Docker.
 manage +args:
-    @{{load-local-postgres}} docker compose run --rm django python ./manage.py {{args}}
+    @just manage-local {{args}}
+
+# manage-local: Execute `manage.py` in local Docker.
+manage-local +args:
+    @{{load-local-postgres}} docker compose -f docker-compose.local.yml run --rm django python ./manage.py {{args}}
+
+# manage-production: Execute `manage.py` in production Docker.
+manage-production +args:
+    @{{load-production-env}} docker compose -f docker-compose.production.yml run --rm django python ./manage.py {{args}}
 
 # setup: Prepare a shell run. Use `local` or `production`.
 setup mode="local":
