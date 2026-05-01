@@ -270,6 +270,7 @@ dump.rdb
 
 ### Project template
 chattersift/media/
+chattersift/static/css/project.css
 
 .pytest_cache/
 .ipython/
