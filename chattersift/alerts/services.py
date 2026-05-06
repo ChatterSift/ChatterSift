@@ -7,5 +7,5 @@ if TYPE_CHECKING:
 
 
 def deliver_match_alert(match: Match) -> None:
-    # Public core deliberately keeps delivery minimal; SaaS can add channels.
+    # Public core deliberately keeps delivery minimal; extensions can add channels.
     return None

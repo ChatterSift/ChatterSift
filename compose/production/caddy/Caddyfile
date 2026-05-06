@@ -35,8 +35,8 @@ chattersift.com, www.chattersift.com {
 	}
 }
 
-# Catch-all for custom domains behind Cloudflare Custom Hostnames.
-# Cloudflare handles edge SSL; Caddy uses internal certs for the origin.
+# Catch-all for custom domains behind managed edge hostnames.
+# The edge handles SSL; Caddy uses internal certs for the origin.
 :443 {
 	tls internal
 

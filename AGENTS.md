@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-Chattersift is a Django 5.2 project generated from cookiecutter-django and adapted for an open-core setup. Core source lives under `chattersift/`, with Django project configuration in `config/`.
+Chattersift is a Django 5.2 project generated from cookiecutter-django and adapted for an extensible setup. Core source lives under `chattersift/`, with Django project configuration in `config/`.
 
 - `chattersift/users/`: authentication and user management.
 - `chattersift/tracking/`: monitors, keywords, and match records.
@@ -11,8 +11,6 @@ Chattersift is a Django 5.2 project generated from cookiecutter-django and adapt
 - `chattersift/core/`: shared utilities and extension contracts.
 - `chattersift/templates/`, `chattersift/static/`: server-rendered UI and assets.
 - `tests/` and `chattersift/**/tests/`: pytest suites.
-
-The private SaaS overlay is expected to live beside this repo as `../chattersift_cloud`.
 
 ## Build, Test, and Development Commands
 
@@ -55,12 +53,12 @@ The test settings read `DATABASE_URL`; development should use Postgres.
 - Keep commits focused; reference issues when relevant.
 - PRs should include: clear summary, testing steps/results, and screenshots for UI/extension changes.
 - Call out migrations, environment-variable changes, or breaking behavior explicitly in the PR description.
-- Keep public core changes independent from private `chattersift_cloud` code; this repo must run without importing the private overlay.
+- Keep public core changes independent; this repo must run without importing external overlays.
 
 
 ## Architecture Notes
 
-This is HTMX/server-rendered first. Django Ninja APIs are opt-in via `CHATTERSIFT_ENABLE_API` and should be added only when an API is genuinely required. Open-core extension should happen through Django apps, URLConfs, settings overlays, and explicit service boundaries.
+This is HTMX/server-rendered first. Django Ninja APIs are opt-in via `CHATTERSIFT_ENABLE_API` and should be added only when an API is genuinely required. Extension should happen through Django apps, URLConfs, settings overlays, and explicit service boundaries.
 
 ## Project-Specific Engineering Practices
 - When fixing bugs, add a regression test in the closest test module before merging.
