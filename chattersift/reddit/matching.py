@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from .contracts import MatchDecision
+from .contracts import MatchRequest
+from .contracts import MonitorMatchMode
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from .interfaces import MatchDecision
-    from .interfaces import MatchRequest
-    from .interfaces import MonitorIntent
-    from .interfaces import RedditItemPayload
+    from .contracts import MonitorIntent
+    from .contracts import RedditItemPayload
 
 
 class RedditMatcher:
@@ -33,7 +35,28 @@ class KeywordRedditMatcher(RedditMatcher):
 
     def evaluate(self, request: MatchRequest) -> MatchDecision:
         """Return whether any monitor keyword appears in the Reddit item."""
-        raise NotImplementedError
+        monitor_id = request.intent.monitor_id
+        if monitor_id is None:
+            missing_monitor_id = "Match requests must include a persisted monitor id."
+            raise ValueError(missing_monitor_id)
+
+        searchable_text = f"{request.item.title}\n{request.item.body}".casefold()
+        matched_keyword = next(
+            (
+                keyword
+                for keyword in request.intent.keywords
+                if keyword and keyword.casefold() in searchable_text
+            ),
+            "",
+        )
+        matched = bool(matched_keyword)
+        return MatchDecision(
+            monitor_id=monitor_id,
+            reddit_id=request.item.reddit_id,
+            matched=matched,
+            confidence=1.0 if matched else 0.0,
+            reason=f"keyword:{matched_keyword}" if matched else "keyword:not_found",
+        )
 
 
 class SemanticRedditMatcher(RedditMatcher):
@@ -47,7 +70,11 @@ class SemanticRedditMatcher(RedditMatcher):
 
     def evaluate(self, request: MatchRequest) -> MatchDecision:
         """Return whether the item semantically satisfies the monitor intent."""
-        raise NotImplementedError
+        msg = (
+            "Configure a concrete semantic Reddit matcher before evaluating "
+            "semantic requests."
+        )
+        raise NotImplementedError(msg)
 
 
 def build_match_requests(
@@ -64,7 +91,18 @@ def build_match_requests(
         implementation should not require users to choose post or comment
         matching; every fetched item is evaluated against relevant intents.
     """
-    raise NotImplementedError
+    requests: list[MatchRequest] = []
+    intent_list = [intent for intent in intents if intent.monitor_id is not None]
+
+    for item in items:
+        item_subreddit = item.subreddit.casefold()
+        for intent in intent_list:
+            if intent.subreddit.casefold() != item_subreddit:
+                continue
+
+            requests.append(MatchRequest(intent=intent, item=item))
+
+    return requests
 
 
 def evaluate_match_requests(
@@ -82,4 +120,14 @@ def evaluate_match_requests(
         MatchDecision rows ready for persistence. KEYWORD requests use the
         keyword matcher; SEMANTIC requests use the semantic matcher.
     """
-    raise NotImplementedError
+    keyword_evaluator = keyword_matcher or KeywordRedditMatcher()
+    semantic_evaluator = semantic_matcher or SemanticRedditMatcher()
+
+    decisions: list[MatchDecision] = []
+    for request in requests:
+        if request.intent.match_mode == MonitorMatchMode.KEYWORD:
+            decisions.append(keyword_evaluator.evaluate(request))
+        elif request.intent.match_mode == MonitorMatchMode.SEMANTIC:
+            decisions.append(semantic_evaluator.evaluate(request))
+
+    return decisions

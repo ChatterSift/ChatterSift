@@ -1,18 +1,40 @@
 from django.db import models
 
+from .contracts import RedditFeedFormat
+from .contracts import RedditFeedKind
+
 
 class SubredditFetchState(models.Model):
-    subreddit = models.CharField(max_length=100, unique=True)
+    kind = models.CharField(max_length=32, choices=RedditFeedKind)
+    format = models.CharField(max_length=16, choices=RedditFeedFormat)
+    subreddit = models.CharField(max_length=100)
+    query_fingerprint = models.CharField(max_length=64, blank=True)
     last_seen_fullname = models.CharField(max_length=255, blank=True)
     last_fetched_at = models.DateTimeField(null=True, blank=True)
+    next_fetch_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    consecutive_failures = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["subreddit"]
+        ordering = ["subreddit", "kind", "format", "query_fingerprint"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["kind", "format", "subreddit", "query_fingerprint"],
+                name="unique_reddit_fetch_state_feed",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["kind", "format", "subreddit"],
+                name="reddit_subr_kind_eb52e6_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
-        return f"r/{self.subreddit}"
+        suffix = f":{self.query_fingerprint}" if self.query_fingerprint else ""
+        return f"{self.kind}/{self.format}:r/{self.subreddit}{suffix}"
 
 
 class RedditItem(models.Model):

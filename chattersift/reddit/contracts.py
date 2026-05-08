@@ -217,6 +217,8 @@ class FetchResult:
         matched_count: Number of monitor matches created.
         skipped_count: Number of payloads skipped during normalization/upsert.
         status_code: HTTP status code when available.
+        last_seen_fullname: Newest Reddit fullname seen during this fetch, used
+            by scheduling state.
     """
 
     spec: RedditFeedSpec
@@ -225,6 +227,7 @@ class FetchResult:
     matched_count: int
     skipped_count: int
     status_code: int | None
+    last_seen_fullname: str = ""
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -35,6 +35,7 @@ dependencies = [
   "django-storages[s3]==1.14.6",
   "gunicorn==25.3.0",
   "hiredis==3.3.1",
+  "lxml==6.1.0",
   "pillow==12.2.0",
   "psycopg[binary]==3.3.3",
   "python-slugify==8.0.4",
@@ -62,6 +63,7 @@ dev = [
   "sphinx==9.1.0",
   "sphinx-autobuild==2025.8.25",
   "ty>=0.0.32",
+  "types-lxml==2026.2.16",
   "watchfiles==1.1.1",
   "werkzeug[watchdog]==3.1.8",
 ]

@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .interfaces import RedditFeedSpec
-    from .interfaces import RedditItemPayload
+    from .contracts import RedditFeedSpec
+    from .contracts import RedditItemPayload
 
 
 class RedditClient:
