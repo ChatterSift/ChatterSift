@@ -37,5 +37,8 @@ MEDIA_URL = "http://media.testserver/"
 # Chattersift
 # ------------------------------------------------------------------------------
 CHATTERSIFT_ENABLE_API = True
+
+# Interface: Template tests render static tags without requiring compiled assets.
+COMPRESS_ENABLED = False
 # Your stuff...
 # ------------------------------------------------------------------------------
