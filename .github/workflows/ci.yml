@@ -63,7 +63,7 @@ jobs:
 
       - name: Create test database
         run: |
-          sudo -u postgres psql --command="CREATE USER chattersift WITH PASSWORD 'chattersift';"
+          sudo -u postgres psql --command="CREATE USER chattersift WITH CREATEDB PASSWORD 'chattersift';"
           sudo -u postgres createdb --owner=chattersift chattersift
 
       - name: Install Python dependencies
