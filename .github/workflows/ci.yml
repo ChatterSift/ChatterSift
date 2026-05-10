@@ -1,10 +1,5 @@
 name: CI
 
-# Enable Buildkit and let compose use it to speed up image building
-env:
-  DOCKER_BUILDKIT: 1
-  COMPOSE_DOCKER_CLI_BUILD: 1
-
 on:
   pull_request:
     branches: ['main']
@@ -29,70 +24,56 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version-file: '.python-version'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
       # Consider using pre-commit.ci for open source project
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
 
-  # With no caching at all the entire ci process takes 3m to complete!
   pytest:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://chattersift:chattersift@localhost:5432/chattersift
+      REDIS_URL: redis://localhost:6379/0
 
     steps:
       - name: Checkout Code Repository
         uses: actions/checkout@v6
 
-      - name: Create Docker env files
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: '.python-version'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install system services
         run: |
-          mkdir -p .envs/.local
-          cat > .envs/.local/.django <<'EOF'
-          USE_DOCKER=yes
-          IPYTHONDIR=/app/.ipython
-          REDIS_URL=redis://redis:6379/0
-          CELERY_FLOWER_USER=ci
-          CELERY_FLOWER_PASSWORD=ci
-          EOF
-          cat > .envs/.local/.postgres <<'EOF'
-          POSTGRES_HOST=postgres
-          POSTGRES_PORT=5432
-          POSTGRES_DB=chattersift
-          POSTGRES_USER=chattersift
-          POSTGRES_PASSWORD=chattersift
-          EOF
+          sudo apt-get update
+          sudo apt-get install --yes postgresql redis-server
+          sudo systemctl start postgresql
+          sudo systemctl start redis-server
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Create test database
+        run: |
+          sudo -u postgres psql --command="CREATE USER chattersift WITH PASSWORD 'chattersift';"
+          sudo -u postgres createdb --owner=chattersift chattersift
 
-      - name: Build and cache local backend
-        uses: docker/bake-action@v6
-        with:
-          push: false
-          load: true
-          files: docker-compose.local.yml
-          targets: django
-          set: |
-            django.cache-from=type=gha,scope=django-cached-tests
-            django.cache-to=type=gha,scope=django-cached-tests,mode=max
-            postgres.cache-from=type=gha,scope=postgres-cached-tests
-            postgres.cache-to=type=gha,scope=postgres-cached-tests,mode=max
-
-      - name: Build and cache docs
-        uses: docker/bake-action@v6
-        with:
-          push: false
-          load: true
-          files: docker-compose.docs.yml
-          set: |
-            docs.cache-from=type=gha,scope=cached-docs
-            docs.cache-to=type=gha,scope=cached-docs,mode=max
+      - name: Install Python dependencies
+        run: uv sync --locked --all-groups
 
       - name: Check DB Migrations
-        run: docker compose -f docker-compose.local.yml run --rm django python manage.py makemigrations --check
+        run: uv run python manage.py makemigrations --check
 
       - name: Run DB Migrations
-        run: docker compose -f docker-compose.local.yml run --rm django python manage.py migrate
+        run: uv run python manage.py migrate
 
       - name: Run Django Tests
-        run: docker compose -f docker-compose.local.yml run django pytest
-
-      - name: Tear down the Stack
-        run: docker compose -f docker-compose.local.yml down
+        run: uv run pytest
