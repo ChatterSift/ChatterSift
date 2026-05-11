@@ -339,6 +339,22 @@ ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 # https://docs.allauth.org/en/latest/account/configuration.html
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+# https://docs.allauth.org/en/latest/account/rate_limits.html
+# Interface: allauth consumes these by action name to protect account workflows.
+ACCOUNT_RATE_LIMITS = {
+    "change_password": "3/10m/user",
+    "change_phone": "1/10m/user",
+    "manage_email": "5/10m/user",
+    "reset_password": "5/10m/ip,3/h/key",
+    "reauthenticate": "5/10m/user",
+    "reset_password_from_key": "5/10m/ip",
+    "signup": "5/h/ip,20/d/ip",
+    "login": "10/5m/ip",
+    "login_failed": "5/10m/ip,3/10m/key",
+    "confirm_email": "1/10m/key",
+    "request_login_code": "5/10m/ip,3/h/key",
+    "verify_phone": "1/2m/key,3/10m/ip",
+}
 # https://docs.allauth.org/en/latest/account/configuration.html
 ACCOUNT_ADAPTER = "chattersift.users.adapters.AccountAdapter"
 # https://docs.allauth.org/en/latest/account/forms.html
