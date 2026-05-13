@@ -80,6 +80,21 @@
   border-color: var(--color-primary);
 }
 
+[x-cloak] {
+  display: none !important;
+}
+
+.htmx-indicator {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease-in-out;
+}
+
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  opacity: 1;
+}
+
 /* Landing page: dot grid background */
 .landing-dot-grid {
   background-image: radial-gradient(circle, oklch(70% 0.02 260) 1px, transparent 1px);

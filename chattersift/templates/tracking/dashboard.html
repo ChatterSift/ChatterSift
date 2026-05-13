@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+
+{% block title %}
+  {% translate "Dashboard" %} - ChatterSift
+{% endblock title %}
+{% block main %}
+  {% include "tracking/_dashboard_content.html" %}
+{% endblock main %}

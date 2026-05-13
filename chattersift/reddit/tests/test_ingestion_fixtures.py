@@ -167,7 +167,7 @@ def test_fetch_feed_normalize_and_match_is_idempotent_with_raw_fixture() -> None
     second_result = fetch_feed_normalize_and_match(spec, client=client)
 
     assert first_result.upserted_count == len(payloads)
-    assert second_result.upserted_count == len(payloads)
+    assert second_result.upserted_count == 0
     assert first_result.matched_count >= 1
     assert second_result.matched_count == 0
     assert RedditItem.objects.count() == len(
@@ -221,6 +221,7 @@ def test_json_and_atom_fixture_ingestion_upserts_same_item_fields_by_type(
     """Verify JSON and Atom fixtures upsert identical post and comment rows."""
     assert json_fixture_paths
     for json_fixture_path in json_fixture_paths:
+        reset_reddit_ingestion_tables()
         atom_fixture_path = json_fixture_path.with_suffix(".atom")
 
         json_snapshot = ingest_fixture_and_snapshot_full_items(
@@ -348,14 +349,18 @@ def parse_fixture_payloads(fixture_path: Path) -> list[RedditItemPayload]:
 def select_match_target(
     payloads: list[RedditItemPayload],
 ) -> tuple[RedditItemPayload, str]:
-    """Return a payload and keyword guaranteed to match its normalized text."""
+    """Return a payload and keyword guaranteed to match production keyword text."""
     assert payloads
     for payload in payloads:
-        keyword = first_searchable_word(f"{payload.title} {payload.body}")
+        if payload.item_type == RedditItem.RedditItemType.COMMENT:
+            searchable_value = payload.body
+        else:
+            searchable_value = f"{payload.title} {payload.body}"
+        keyword = first_searchable_word(searchable_value)
         if keyword:
             return payload, keyword
 
-    msg = "Fixture payloads must include at least one searchable title/body word."
+    msg = "Fixture payloads must include at least one searchable production keyword word."
     raise AssertionError(msg)
 
 

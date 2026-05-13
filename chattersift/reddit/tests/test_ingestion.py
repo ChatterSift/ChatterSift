@@ -100,8 +100,70 @@ def test_fetch_feed_normalize_and_match_is_idempotent_for_existing_matches() -> 
     second_result = fetch_feed_normalize_and_match(spec, client=client)
 
     assert first_result.matched_count == 1
+    assert first_result.upserted_count == 1
+    assert second_result.upserted_count == 0
     assert second_result.matched_count == 0
     assert Match.objects.count() == 1
+
+
+def test_fetch_feed_normalize_and_match_counts_changed_existing_items() -> None:
+    RedditItem.objects.create(
+        reddit_id="t3_changed",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/changed/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Original title",
+        body="Original body",
+    )
+    payload = RedditItemPayload(
+        reddit_id="t3_changed",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/changed/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Updated title",
+        body="Original body",
+    )
+    spec = RedditFeedSpec(
+        kind=RedditFeedKind.POST_SEARCH,
+        format=RedditFeedFormat.RSS,
+        subreddit="django",
+        query='"postgres"',
+        query_fingerprint="changed",
+    )
+
+    result = fetch_feed_normalize_and_match(spec, client=FakeRedditClient([payload]))
+
+    assert result.fetched_count == 1
+    assert result.upserted_count == 1
+    assert RedditItem.objects.get(reddit_id="t3_changed").title == "Updated title"
+
+
+def test_fetch_feed_normalize_and_match_does_not_match_comment_context_title() -> None:
+    user = UserFactory()
+    Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    payload = RedditItemPayload(
+        reddit_id="t1_context_only",
+        item_type=RedditItem.RedditItemType.COMMENT,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/postgres/example/comment/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Postgres with Django",
+        body="This comment talks about connection pooling without the tracked keyword.",
+    )
+    spec = RedditFeedSpec(
+        kind=RedditFeedKind.COMMENT_STREAM,
+        format=RedditFeedFormat.JSON,
+        subreddit="django",
+    )
+
+    result = fetch_feed_normalize_and_match(spec, client=FakeRedditClient([payload]))
+
+    assert result.upserted_count == 1
+    assert result.matched_count == 0
+    assert RedditItem.objects.filter(reddit_id="t1_context_only").exists()
+    assert not Match.objects.filter(reddit_item_id="t1_context_only").exists()
 
 
 def test_fetch_feed_normalize_and_match_records_failure_state() -> None:

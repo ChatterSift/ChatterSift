@@ -29,8 +29,9 @@ class RedditMatcher:
 class KeywordRedditMatcher(RedditMatcher):
     """Deterministic matcher for keyword-based monitor intents.
 
-    Keyword requests use normalized keyword containment in the fetched title/body
-    text to produce a MatchDecision.
+    Keyword requests use normalized keyword containment to produce a
+    MatchDecision. Posts match against title and body; comments match against
+    only the comment body so post context cannot create false comment matches.
     """
 
     def evaluate(self, request: MatchRequest) -> MatchDecision:
@@ -40,7 +41,7 @@ class KeywordRedditMatcher(RedditMatcher):
             missing_monitor_id = "Match requests must include a persisted monitor id."
             raise ValueError(missing_monitor_id)
 
-        searchable_text = f"{request.item.title}\n{request.item.body}".casefold()
+        searchable_text = _keyword_searchable_text(request.item)
         matched_keyword = next(
             (keyword for keyword in request.intent.keywords if keyword and keyword.casefold() in searchable_text),
             "",
@@ -124,3 +125,9 @@ def evaluate_match_requests(
             decisions.append(semantic_evaluator.evaluate(request))
 
     return decisions
+
+
+def _keyword_searchable_text(item: RedditItemPayload) -> str:
+    if item.item_type == "comment":
+        return item.body.casefold()
+    return f"{item.title}\n{item.body}".casefold()

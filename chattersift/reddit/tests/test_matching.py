@@ -38,6 +38,51 @@ def test_keyword_matcher_matches_title_and_body() -> None:
     assert decision.reason == "keyword:postgres"
 
 
+def test_keyword_matcher_does_not_match_comment_context_title() -> None:
+    intent = MonitorIntent(
+        subreddit="django",
+        keywords=("postgres",),
+        monitor_id=MONITOR_ID,
+    )
+    item = RedditItemPayload(
+        reddit_id="t1_comment_context",
+        item_type=RedditItem.RedditItemType.COMMENT,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/match/example/comment/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Postgres with Django",
+        body="This comment only talks about connection pooling.",
+    )
+
+    decision = KeywordRedditMatcher().evaluate(MatchRequest(intent=intent, item=item))
+
+    assert decision.matched is False
+    assert decision.confidence == 0.0
+    assert decision.reason == "keyword:not_found"
+
+
+def test_keyword_matcher_matches_comment_body() -> None:
+    intent = MonitorIntent(
+        subreddit="django",
+        keywords=("postgres",),
+        monitor_id=MONITOR_ID,
+    )
+    item = RedditItemPayload(
+        reddit_id="t1_comment_body",
+        item_type=RedditItem.RedditItemType.COMMENT,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/match/example/comment/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Django deployment",
+        body="This comment mentions Postgres directly.",
+    )
+
+    decision = KeywordRedditMatcher().evaluate(MatchRequest(intent=intent, item=item))
+
+    assert decision.matched is True
+    assert decision.reason == "keyword:postgres"
+
+
 def test_build_match_requests_filters_by_subreddit() -> None:
     """Build match requests filters by subreddit, ignoring case."""
     intents = [

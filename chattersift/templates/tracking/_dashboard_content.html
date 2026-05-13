@@ -1,0 +1,39 @@
+{% load i18n %}
+
+<div id="dashboard-content" class="space-y-8">
+  <section class="grid gap-6 lg:grid-cols-[minmax(0,24rem)_1fr]">
+    {% include "tracking/_monitor_form.html" %}
+    <div class="space-y-3">
+      <div>
+        <h1 class="font-display text-2xl font-bold tracking-tight">{% translate "Dashboard" %}</h1>
+        <p class="text-sm text-base-content/70">
+          {% translate "Track Reddit keywords by subreddit and review recent matches." %}
+        </p>
+      </div>
+      <div class="stats stats-vertical sm:stats-horizontal border border-base-300 bg-base-100 w-full">
+        <div class="stat">
+          <div class="stat-title">{% translate "Subreddits" %}</div>
+          <div class="stat-value text-primary">{{ subreddit_groups|length }}</div>
+        </div>
+        <div class="stat">
+          <div class="stat-title">{% translate "Active keywords" %}</div>
+          <div class="stat-value text-primary">{{ active_monitor_count }}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="space-y-4">
+    {% if subreddit_groups %}
+      {% for group in subreddit_groups %}
+        {% include "tracking/_subreddit_group.html" with group=group %}
+      {% endfor %}
+    {% else %}
+      <div class="border border-base-300 bg-base-100 p-6 rounded-box">
+        <p class="font-semibold">{% translate "No monitors yet" %}</p>
+        <p class="text-sm text-base-content/70">
+          {% translate "Create a subreddit keyword monitor to start collecting matches." %}
+        </p>
+      </div>
+    {% endif %}
+  </section>
+</div>

@@ -123,7 +123,8 @@ def _upsert_and_match_payloads(
     keyword_matcher: RedditMatcher | None,
     semantic_matcher: RedditMatcher | None,
 ) -> FetchResult:
-    upserted_payloads = []
+    valid_payloads = []
+    upserted_count = 0
     skipped_count = 0
     last_seen_fullname = ""
 
@@ -132,26 +133,27 @@ def _upsert_and_match_payloads(
             last_seen_fullname = payload.reddit_id
 
         try:
-            _upsert_item(payload)
+            _, did_upsert = _upsert_item(payload)
         except TypeError, ValueError:
             skipped_count += 1
             continue
 
-        upserted_payloads.append(payload)
+        valid_payloads.append(payload)
+        upserted_count += int(did_upsert)
 
     intents = build_monitor_intents_for_active_monitors()
-    requests = build_match_requests(intents, upserted_payloads)
+    requests = build_match_requests(intents, valid_payloads)
     decisions = evaluate_match_requests(
         requests,
         keyword_matcher=keyword_matcher or KeywordRedditMatcher(),
         semantic_matcher=semantic_matcher,
     )
-    matched_count = _persist_match_decisions(decisions, upserted_payloads)
+    matched_count = _persist_match_decisions(decisions, valid_payloads)
 
     return FetchResult(
         spec=spec,
         fetched_count=len(payloads),
-        upserted_count=len(upserted_payloads),
+        upserted_count=upserted_count,
         matched_count=matched_count,
         skipped_count=skipped_count,
         status_code=None,
@@ -159,21 +161,33 @@ def _upsert_and_match_payloads(
     )
 
 
-def _upsert_item(payload) -> RedditItem:
+def _upsert_item(payload) -> tuple[RedditItem, bool]:
+    """Insert or update one item and report whether persisted data changed."""
     _validate_payload(payload)
-    item, _ = RedditItem.objects.update_or_create(
+    defaults = {
+        "item_type": payload.item_type,
+        "subreddit": payload.subreddit,
+        "author": payload.author,
+        "title": payload.title,
+        "body": payload.body,
+        "permalink": payload.permalink,
+        "occurred_at": payload.occurred_at,
+    }
+    item, created = RedditItem.objects.get_or_create(
         reddit_id=payload.reddit_id,
-        defaults={
-            "item_type": payload.item_type,
-            "subreddit": payload.subreddit,
-            "author": payload.author,
-            "title": payload.title,
-            "body": payload.body,
-            "permalink": payload.permalink,
-            "occurred_at": payload.occurred_at,
-        },
+        defaults=defaults,
     )
-    return item
+    if created:
+        return item, True
+
+    changed_fields = [field_name for field_name, value in defaults.items() if getattr(item, field_name) != value]
+    if not changed_fields:
+        return item, False
+
+    for field_name in changed_fields:
+        setattr(item, field_name, defaults[field_name])
+    item.save(update_fields=changed_fields)
+    return item, True
 
 
 def _persist_match_decisions(decisions, payloads: list) -> int:

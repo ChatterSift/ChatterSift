@@ -40,6 +40,8 @@
     {# Placed at the top of the document so pages load faster with defer #}
     {% block javascript %}
       {% compress js %}
+        <script defer src="{% static 'js/vendor/htmx.min.js' %}"></script>
+        <script defer src="{% static 'js/vendor/alpine.min.js' %}"></script>
         <script defer src="{% static 'js/project.js' %}"></script>
       {% endcompress %}
     {% endblock javascript %}
@@ -69,6 +71,9 @@
               </li>
               {% if request.user.is_authenticated %}
                 <li>
+                  <a href="{% url 'tracking:dashboard' %}">{% translate "Dashboard" %}</a>
+                </li>
+                <li>
                   <a href="{% url 'users:detail' request.user.pk %}">{% translate "My Profile" %}</a>
                 </li>
                 <li>
@@ -94,10 +99,16 @@
             <li>
               <a href="{% url 'home' %}">{% translate "Home" %}</a>
             </li>
+            {% if request.user.is_authenticated %}
+              <li>
+                <a href="{% url 'tracking:dashboard' %}">{% translate "Dashboard" %}</a>
+              </li>
+            {% endif %}
           </ul>
         </div>
         <div class="navbar-end hidden lg:flex gap-2">
           {% if request.user.is_authenticated %}
+            <a class="btn btn-ghost btn-sm" href="{% url 'tracking:dashboard' %}">{% translate "Dashboard" %}</a>
             <a class="btn btn-ghost btn-sm"
                href="{% url 'users:detail' request.user.pk %}">{% translate "My Profile" %}</a>
             <a class="btn btn-ghost btn-sm" href="{% url 'account_logout' %}">{% translate "Sign Out" %}</a>
@@ -112,6 +123,11 @@
             {% endif %}
           {% endif %}
         </div>
+      </div>
+      <div id="global-loading"
+           class="htmx-indicator fixed right-4 top-4 z-50 rounded-box bg-neutral px-3 py-2 text-sm text-neutral-content shadow">
+        <span class="loading loading-spinner loading-xs align-middle"></span>
+        <span class="ml-2">{% translate "Loading" %}</span>
       </div>
       <!-- Messages -->
       {% if messages %}

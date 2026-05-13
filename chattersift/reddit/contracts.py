@@ -45,7 +45,8 @@ class RedditFeedFormat(models.TextChoices):
 class MonitorMatchMode(models.TextChoices):
     """How fetched Reddit content should be evaluated for a monitor.
 
-    KEYWORD uses deterministic text matching against title/body content.
+    KEYWORD uses deterministic text matching. Posts are matched against title
+    and body content; comments are matched against the comment body only.
     SEMANTIC uses a semantic matcher, likely LLM-backed, against the same
     normalized content. The database may start keyword-only; this interface is
     deliberately wider so semantic matching can be added without redesigning

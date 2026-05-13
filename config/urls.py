@@ -18,8 +18,7 @@ urlpatterns = [
     # User management
     path("users/", include("chattersift.users.urls", namespace="users")),
     path("accounts/", include("allauth.urls")),
-    # Your stuff: custom urls includes go here
-    # ...
+    path("", include("chattersift.tracking.urls", namespace="tracking")),
     # Media files
     *static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT),
 ]

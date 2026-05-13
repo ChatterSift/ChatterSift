@@ -115,6 +115,10 @@ CHATTERSIFT_REDDIT_FETCH_INTERVAL_SECONDS = env.int(
     "CHATTERSIFT_REDDIT_FETCH_INTERVAL_SECONDS",
     default=300,
 )
+CHATTERSIFT_REDDIT_SCHEDULER_INTERVAL_SECONDS = env.int(
+    "CHATTERSIFT_REDDIT_SCHEDULER_INTERVAL_SECONDS",
+    default=60,
+)
 CHATTERSIFT_REDDIT_FAILURE_BACKOFF_BASE_SECONDS = env.int(
     "CHATTERSIFT_REDDIT_FAILURE_BACKOFF_BASE_SECONDS",
     default=300,
@@ -331,6 +335,12 @@ CELERY_TASK_TIME_LIMIT = 5 * 60
 CELERY_TASK_SOFT_TIME_LIMIT = 60
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#beat-scheduler
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_BEAT_SCHEDULE = {
+    "fetch-due-reddit-feeds": {
+        "task": "chattersift.reddit.tasks.fetch_due_reddit_feeds",
+        "schedule": CHATTERSIFT_REDDIT_SCHEDULER_INTERVAL_SECONDS,
+    },
+}
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#worker-send-task-events
 CELERY_WORKER_SEND_TASK_EVENTS = True
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-task_send_sent_event
