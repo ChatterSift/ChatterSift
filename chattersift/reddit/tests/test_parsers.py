@@ -8,9 +8,7 @@ from chattersift.reddit.models import RedditItem
 from chattersift.reddit.parsers import parse_reddit_atom_response
 from chattersift.reddit.parsers import parse_reddit_json_response
 
-FIXTURE_ROOT = (
-    Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "reddit" / "raw"
-)
+FIXTURE_ROOT = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "reddit" / "raw"
 FIXTURE_ITEM_LIMIT = 5
 
 
@@ -24,9 +22,7 @@ def test_parse_json_post_listing() -> None:
     )
 
     assert len(payloads) == FIXTURE_ITEM_LIMIT
-    assert all(
-        payload.item_type == RedditItem.RedditItemType.POST for payload in payloads
-    )
+    assert all(payload.item_type == RedditItem.RedditItemType.POST for payload in payloads)
     assert payloads[0].reddit_id.startswith("t3_")
     assert payloads[0].subreddit == "django"
     assert payloads[0].permalink.startswith("https://www.reddit.com/r/django/")
@@ -38,9 +34,7 @@ def test_parse_json_comment_stream() -> None:
     )
 
     assert len(payloads) == FIXTURE_ITEM_LIMIT
-    assert all(
-        payload.item_type == RedditItem.RedditItemType.COMMENT for payload in payloads
-    )
+    assert all(payload.item_type == RedditItem.RedditItemType.COMMENT for payload in payloads)
     assert all(payload.title for payload in payloads)
     assert all(payload.body for payload in payloads)
 
@@ -59,9 +53,7 @@ def test_parse_json_comment_search_keeps_returned_post_objects() -> None:
     )
 
     assert payloads
-    assert all(
-        payload.item_type == RedditItem.RedditItemType.POST for payload in payloads
-    )
+    assert all(payload.item_type == RedditItem.RedditItemType.POST for payload in payloads)
 
 
 @pytest.mark.parametrize(
@@ -78,9 +70,7 @@ def test_parse_atom_feeds(fixture_name: str, item_type: str) -> None:
     assert len(payloads) == FIXTURE_ITEM_LIMIT
     assert all(payload.item_type == item_type for payload in payloads)
     assert all(payload.subreddit == "django" for payload in payloads)
-    assert all(
-        payload.permalink.startswith("https://www.reddit.com/") for payload in payloads
-    )
+    assert all(payload.permalink.startswith("https://www.reddit.com/") for payload in payloads)
 
 
 def test_parse_atom_does_not_expand_xml_entities() -> None:

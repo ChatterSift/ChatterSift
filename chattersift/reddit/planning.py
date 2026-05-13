@@ -189,11 +189,7 @@ def build_feed_specs_for_active_monitors(
 
 def normalize_feed_format(feed_format: RedditFeedFormat) -> RedditFeedFormat:
     """Return a RedditFeedFormat enum value from string-like settings input."""
-    return (
-        feed_format
-        if isinstance(feed_format, RedditFeedFormat)
-        else RedditFeedFormat(feed_format)
-    )
+    return feed_format if isinstance(feed_format, RedditFeedFormat) else RedditFeedFormat(feed_format)
 
 
 def normalize_subreddit(value: str) -> str:
@@ -236,9 +232,7 @@ def _stream_requirements(
         if intent.match_mode == MonitorMatchMode.SEMANTIC:
             needs_post_stream = True
             needs_comment_stream = True
-        elif (
-            intent.match_mode == MonitorMatchMode.KEYWORD and feed_format.value == "rss"
-        ):
+        elif intent.match_mode == MonitorMatchMode.KEYWORD and feed_format.value == "rss":
             needs_comment_stream = True
 
         requirements[subreddit] = (needs_post_stream, needs_comment_stream)

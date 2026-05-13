@@ -61,11 +61,7 @@ def get_due_feed_specs(*, limit: int | None = None) -> list[RedditFeedSpec]:
     due_specs: list[RedditFeedSpec] = []
     for spec in planned_specs:
         state = states.get(_state_identity(spec))
-        if (
-            state is not None
-            and state.next_fetch_at is not None
-            and state.next_fetch_at > now
-        ):
+        if state is not None and state.next_fetch_at is not None and state.next_fetch_at > now:
             continue
 
         due_specs.append(spec)

@@ -57,9 +57,7 @@ def test_build_rss_feed_specs_for_keyword_intents() -> None:
         (RedditFeedKind.COMMENT_STREAM, RedditFeedFormat.RSS),
         (RedditFeedKind.POST_SEARCH, RedditFeedFormat.RSS),
     ]
-    search_spec = next(
-        spec for spec in specs if spec.kind == RedditFeedKind.POST_SEARCH
-    )
+    search_spec = next(spec for spec in specs if spec.kind == RedditFeedKind.POST_SEARCH)
     assert search_spec.query == '"htmx" OR "postgres"'
     assert search_spec.query_fingerprint
 

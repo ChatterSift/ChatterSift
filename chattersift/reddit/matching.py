@@ -42,11 +42,7 @@ class KeywordRedditMatcher(RedditMatcher):
 
         searchable_text = f"{request.item.title}\n{request.item.body}".casefold()
         matched_keyword = next(
-            (
-                keyword
-                for keyword in request.intent.keywords
-                if keyword and keyword.casefold() in searchable_text
-            ),
+            (keyword for keyword in request.intent.keywords if keyword and keyword.casefold() in searchable_text),
             "",
         )
         matched = bool(matched_keyword)
@@ -70,10 +66,7 @@ class SemanticRedditMatcher(RedditMatcher):
 
     def evaluate(self, request: MatchRequest) -> MatchDecision:
         """Return whether the item semantically satisfies the monitor intent."""
-        msg = (
-            "Configure a concrete semantic Reddit matcher before evaluating "
-            "semantic requests."
-        )
+        msg = "Configure a concrete semantic Reddit matcher before evaluating semantic requests."
         raise NotImplementedError(msg)
 
 

@@ -30,11 +30,7 @@ def test_mark_feed_success_delays_next_fetch(settings) -> None:
     settings.CHATTERSIFT_REDDIT_FEED_FORMAT = "rss"
     user = UserFactory()
     Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
-    spec = next(
-        due_spec
-        for due_spec in get_due_feed_specs()
-        if due_spec.kind == RedditFeedKind.POST_SEARCH
-    )
+    spec = next(due_spec for due_spec in get_due_feed_specs() if due_spec.kind == RedditFeedKind.POST_SEARCH)
 
     mark_feed_success(
         spec,
