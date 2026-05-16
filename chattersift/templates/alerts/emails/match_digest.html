@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>New Reddit matches</title>
+  </head>
+  <body>
+    <h1>New Reddit matches</h1>
+    {% for alert in alerts %}
+      <section>
+        <h2>r/{{ alert.subreddit }}</h2>
+        <p>
+          <strong>Keywords:</strong> {{ alert.matched_keywords|join:", " }}
+        </p>
+        {% if alert.title %}<h3>{{ alert.highlighted_title }}</h3>{% endif %}
+        <p>{{ alert.highlighted_body }}</p>
+        <p>
+          <a href="{{ alert.permalink }}">Open on Reddit</a>
+        </p>
+      </section>
+    {% endfor %}
+  </body>
+</html>

@@ -13,6 +13,8 @@
       <div class="flex flex-wrap gap-3">
         <a class="btn btn-primary btn-sm" href="{% url 'users:update' %}">My Info</a>
         <a class="btn btn-primary btn-sm" href="{% url 'account_email' %}">E-Mail</a>
+        <a class="btn btn-primary btn-sm"
+           href="{% url 'alerts:notification_settings' %}">Notifications</a>
         <a class="btn btn-primary btn-sm" href="{% url 'mfa_index' %}">MFA</a>
       </div>
     {% endif %}

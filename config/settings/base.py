@@ -119,6 +119,10 @@ CHATTERSIFT_REDDIT_SCHEDULER_INTERVAL_SECONDS = env.int(
     "CHATTERSIFT_REDDIT_SCHEDULER_INTERVAL_SECONDS",
     default=60,
 )
+CHATTERSIFT_ALERT_DISPATCH_INTERVAL_SECONDS = env.int(
+    "CHATTERSIFT_ALERT_DISPATCH_INTERVAL_SECONDS",
+    default=60,
+)
 CHATTERSIFT_REDDIT_FAILURE_BACKOFF_BASE_SECONDS = env.int(
     "CHATTERSIFT_REDDIT_FAILURE_BACKOFF_BASE_SECONDS",
     default=300,
@@ -260,6 +264,10 @@ EMAIL_BACKEND = env(
     "DJANGO_EMAIL_BACKEND",
     default="django.core.mail.backends.smtp.EmailBackend",
 )
+DEFAULT_FROM_EMAIL = env(
+    "DJANGO_DEFAULT_FROM_EMAIL",
+    default="noreply@chattersift.com",
+)
 # https://docs.djangoproject.com/en/dev/ref/settings/#email-timeout
 EMAIL_TIMEOUT = 5
 
@@ -339,6 +347,10 @@ CELERY_BEAT_SCHEDULE = {
     "fetch-due-reddit-feeds": {
         "task": "chattersift.reddit.tasks.fetch_due_reddit_feeds",
         "schedule": CHATTERSIFT_REDDIT_SCHEDULER_INTERVAL_SECONDS,
+    },
+    "send-due-match-notifications": {
+        "task": "chattersift.alerts.tasks.send_due_match_notifications",
+        "schedule": CHATTERSIFT_ALERT_DISPATCH_INTERVAL_SECONDS,
     },
 }
 # https://docs.celeryq.dev/en/stable/userguide/configuration.html#worker-send-task-events

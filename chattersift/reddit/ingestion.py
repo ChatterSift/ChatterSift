@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from django.db import transaction
 
+from chattersift.alerts.services import enqueue_immediate_match_notifications
 from chattersift.tracking.models import Match
 
 from .clients import RedditClient
@@ -160,13 +161,14 @@ def _upsert_and_match_payloads(
         keyword_matcher=keyword_matcher or KeywordRedditMatcher(),
         semantic_matcher=semantic_matcher,
     )
-    matched_count = _persist_match_decisions(decisions, valid_payloads)
+    created_match_ids = _persist_match_decisions(decisions, valid_payloads)
+    enqueue_immediate_match_notifications(created_match_ids)
 
     return FetchResult(
         spec=spec,
         fetched_count=len(payloads),
         upserted_count=upserted_count,
-        matched_count=matched_count,
+        matched_count=len(created_match_ids),
         skipped_count=skipped_count,
         status_code=None,
         last_seen_fullname=last_seen_fullname,
@@ -202,9 +204,9 @@ def _upsert_item(payload) -> tuple[RedditItem, bool]:
     return item, True
 
 
-def _persist_match_decisions(decisions, payloads: list) -> int:
+def _persist_match_decisions(decisions, payloads: list) -> list[int]:
     payloads_by_id = {payload.reddit_id: payload for payload in payloads}
-    created_count = 0
+    created_match_ids: list[int] = []
 
     for decision in decisions:
         if not decision.matched:
@@ -214,7 +216,7 @@ def _persist_match_decisions(decisions, payloads: list) -> int:
         if payload is None:
             continue
 
-        _, created = Match.objects.get_or_create(
+        match, created = Match.objects.get_or_create(
             monitor_id=decision.monitor_id,
             reddit_item_id=decision.reddit_id,
             defaults={
@@ -224,9 +226,10 @@ def _persist_match_decisions(decisions, payloads: list) -> int:
                 "occurred_at": payload.occurred_at,
             },
         )
-        created_count += int(created)
+        if created and match.pk is not None:
+            created_match_ids.append(match.pk)
 
-    return created_count
+    return created_match_ids
 
 
 def _validate_payload(payload) -> None:

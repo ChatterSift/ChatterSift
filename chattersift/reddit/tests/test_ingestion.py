@@ -77,6 +77,37 @@ def test_fetch_feed_normalize_and_match_upserts_and_creates_matches() -> None:
     assert state.next_fetch_at is not None
 
 
+def test_fetch_feed_normalize_and_match_enqueues_new_matches_after_commit(monkeypatch) -> None:
+    user = UserFactory()
+    Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    payload = RedditItemPayload(
+        reddit_id="t3_notify",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/notify/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Postgres with Django",
+    )
+    spec = RedditFeedSpec(
+        kind=RedditFeedKind.POST_SEARCH,
+        format=RedditFeedFormat.RSS,
+        subreddit="django",
+        query='"postgres"',
+        query_fingerprint="notify",
+    )
+    called = {"match_ids": []}
+
+    def fake_enqueue(match_ids) -> None:
+        called["match_ids"] = list(match_ids)
+
+    monkeypatch.setattr("chattersift.reddit.ingestion.enqueue_immediate_match_notifications", fake_enqueue)
+
+    result = fetch_feed_normalize_and_match(spec, client=FakeRedditClient([payload]))
+
+    assert result.matched_count == 1
+    assert len(called["match_ids"]) == 1
+
+
 def test_fetch_feed_normalize_and_match_is_idempotent_for_existing_matches() -> None:
     user = UserFactory()
     Monitor.objects.create(user=user, subreddit="django", keyword="postgres")

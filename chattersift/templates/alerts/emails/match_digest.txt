@@ -1,0 +1,10 @@
+New Reddit matches
+
+{% for alert in alerts %}
+r/{{ alert.subreddit }}
+Keywords: {{ alert.matched_keywords|join:", " }}
+{% if alert.title %}{{ alert.title }}
+{% endif %}{{ alert.body }}
+{{ alert.permalink }}
+
+{% endfor %}

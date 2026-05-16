@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+
+{% block title %}
+  {% translate "Notification Settings" %}
+{% endblock title %}
+{% block content %}
+  <div class="max-w-2xl space-y-6">
+    <div>
+      <h1 class="font-display text-2xl font-bold tracking-tight">{% translate "Notification Settings" %}</h1>
+      <p class="mt-2 text-sm text-base-content/70">
+        {% translate "Match emails are sent to your verified account email." %}
+      </p>
+    </div>
+    <section class="space-y-4 border border-base-300 bg-base-100 p-6 rounded-box">
+      <div>
+        <p class="text-sm text-base-content/70">{% translate "Recipient" %}</p>
+        <p class="font-medium">{{ request.user.email }}</p>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="{% url 'account_email' %}">{% translate "Manage email" %}</a>
+    </section>
+    <form method="post"
+          class="space-y-4 border border-base-300 bg-base-100 p-6 rounded-box">
+      {% csrf_token %}
+      <div class="form-control">
+        <label class="label" for="{{ form.cadence.id_for_label }}">
+          <span class="label-text">{% translate "Email frequency" %}</span>
+        </label>
+        <select class="select select-bordered w-full"
+                name="{{ form.cadence.name }}"
+                id="{{ form.cadence.id_for_label }}">
+          {% for value, label in form.cadence.field.choices %}
+            <option value="{{ value }}"
+                    {% if form.cadence.value == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        {% if form.cadence.errors %}
+          <div role="alert" class="alert alert-error mt-3">
+            <span>{{ form.cadence.errors|join:", " }}</span>
+          </div>
+        {% endif %}
+      </div>
+      <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+    </form>
+  </div>
+{% endblock content %}
