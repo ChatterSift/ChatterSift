@@ -94,11 +94,8 @@ def test_deactivate_hides_monitor_without_deleting_history(client, user) -> None
     assert reverse("tracking:monitor_deactivate", kwargs={"pk": monitor.pk}) not in response.content.decode()
 
 
-def test_dashboard_template_contains_htmx_controls_and_match_badges(client, user) -> None:
-    postgres = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
-    htmx = Monitor.objects.create(user=user, subreddit="django", keyword="htmx")
-    _create_match(postgres, reddit_item_id="t3_shared", title="Django Postgres deployment")
-    _create_match(htmx, reddit_item_id="t3_shared", title="Django Postgres deployment")
+def test_dashboard_template_contains_htmx_controls(client, user) -> None:
+    Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
     client.force_login(user)
 
     response = client.get(reverse("tracking:dashboard"))
@@ -106,29 +103,59 @@ def test_dashboard_template_contains_htmx_controls_and_match_badges(client, user
     content = response.content.decode()
     assert 'hx-post="/dash/monitors/"' in content
     assert 'hx-indicator="#global-loading"' in content
+
+
+def test_dashboard_does_not_show_match_content(client, user) -> None:
+    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    _create_match(monitor, reddit_item_id="t3_shared", title="Django Postgres deployment")
+    client.force_login(user)
+
+    response = client.get(reverse("tracking:dashboard"))
+
+    content = response.content.decode()
+    assert "Django Postgres deployment" not in content
+
+
+def test_matches_page_requires_login(client) -> None:
+    response = client.get(reverse("tracking:matches"))
+
+    assert response.status_code == HTTPStatus.FOUND
+    assert response.url == f"{reverse(settings.LOGIN_URL)}?next=/dash/matches/"
+
+
+def test_matches_page_shows_matched_content(client, user) -> None:
+    postgres = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    htmx = Monitor.objects.create(user=user, subreddit="django", keyword="htmx")
+    _create_match(postgres, reddit_item_id="t3_shared", title="Django Postgres deployment")
+    _create_match(htmx, reddit_item_id="t3_shared", title="Django Postgres deployment")
+    client.force_login(user)
+
+    response = client.get(reverse("tracking:matches"))
+
+    content = response.content.decode()
     assert "Django Postgres deployment" in content
     assert "https://www.reddit.com/r/django/comments/t3_shared/example/" in content
     assert content.count("badge badge-accent badge-outline") == EXPECTED_MATCH_BADGE_COUNT
 
 
-def test_dashboard_labels_matches_as_posts_or_comments(client, user) -> None:
+def test_matches_page_labels_posts_and_comments(client, user) -> None:
     monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
     _create_match(monitor, reddit_item_id="t3_postgres", title="Django Postgres deployment")
     _create_match(monitor, reddit_item_id="t1_postgres", title="", body="Comment about Postgres")
     client.force_login(user)
 
-    response = client.get(reverse("tracking:dashboard"))
+    response = client.get(reverse("tracking:matches"))
 
     content = response.content.decode()
     assert '<span class="badge badge-info badge-outline">Post</span>' in content
     assert '<span class="badge badge-info badge-outline">Comment</span>' in content
 
 
-def test_dashboard_shows_empty_match_state(client, user) -> None:
+def test_matches_page_shows_empty_state(client, user) -> None:
     Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
     client.force_login(user)
 
-    response = client.get(reverse("tracking:dashboard"))
+    response = client.get(reverse("tracking:matches"))
 
     assert "No matches yet" in response.content.decode()
 

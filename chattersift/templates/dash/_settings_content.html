@@ -1,0 +1,39 @@
+{% load i18n %}
+
+<div class="max-w-2xl space-y-6">
+  <div>
+    <h1 class="font-display text-2xl font-bold tracking-tight">{% translate "Settings" %}</h1>
+    <p class="mt-1 text-sm text-base-content/70">{% translate "Manage your profile, notifications, and account." %}</p>
+  </div>
+  <!-- Profile -->
+  <section class="card border border-base-300 bg-base-100">
+    <div class="card-body">
+      <h2 class="card-title text-base">{% translate "Profile" %}</h2>
+      {% include "dash/_settings_profile.html" %}
+    </div>
+  </section>
+  <!-- Notifications -->
+  <section class="card border border-base-300 bg-base-100">
+    <div class="card-body">
+      <h2 class="card-title text-base">{% translate "Notifications" %}</h2>
+      <div class="mb-3">
+        <p class="text-sm text-base-content/70">{% translate "Recipient" %}</p>
+        <p class="font-medium">{{ request.user.email }}</p>
+      </div>
+      {% include "dash/_settings_notifications.html" %}
+    </div>
+  </section>
+  <!-- Account -->
+  <section class="card border border-base-300 bg-base-100">
+    <div class="card-body">
+      <h2 class="card-title text-base">{% translate "Account" %}</h2>
+      <p class="text-sm text-base-content/70 mb-3">{% translate "Manage your email addresses and security settings." %}</p>
+      <div class="flex flex-wrap gap-2">
+        <a class="btn btn-ghost btn-sm border border-base-300"
+           href="{% url 'account_email' %}">{% translate "Email addresses" %}</a>
+        <a class="btn btn-ghost btn-sm border border-base-300"
+           href="{% url 'mfa_index' %}">{% translate "Two-factor authentication" %}</a>
+      </div>
+    </div>
+  </section>
+</div>

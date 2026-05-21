@@ -1,0 +1,31 @@
+{% load i18n %}
+
+<div class="space-y-8">
+  <div>
+    <h1 class="font-display text-2xl font-bold tracking-tight">{% translate "Matches" %}</h1>
+    <p class="text-sm text-base-content/70">{% translate "Recent Reddit content matching your tracked keywords." %}</p>
+  </div>
+  <div class="space-y-4">
+    {% if has_matches %}
+      {% for group in subreddit_groups %}
+        {% if group.matches %}
+          {% include "tracking/_match_group.html" with group=group %}
+        {% endif %}
+      {% endfor %}
+    {% elif subreddit_groups %}
+      <div class="border border-base-300 bg-base-100 p-6 rounded-box">
+        <p class="font-semibold">{% translate "No matches yet" %}</p>
+        <p class="text-sm text-base-content/70">
+          {% translate "Matches will appear here once your monitored keywords are found in Reddit content." %}
+        </p>
+      </div>
+    {% else %}
+      <div class="border border-base-300 bg-base-100 p-6 rounded-box">
+        <p class="font-semibold">{% translate "No monitors yet" %}</p>
+        <p class="text-sm text-base-content/70">
+          {% translate "Create a subreddit keyword monitor to start collecting matches." %}
+        </p>
+      </div>
+    {% endif %}
+  </div>
+</div>

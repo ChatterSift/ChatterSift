@@ -31,6 +31,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     context = _dashboard_context(request)
     context["dash_active_nav"] = "monitors"
+    if request.headers.get("HX-Request"):
+        return render(request, "tracking/_dashboard_content.html", context)
     return render(request, "tracking/dashboard.html", context)
 
 
@@ -67,6 +69,23 @@ def monitor_deactivate(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @require_GET
+def matches(request: HttpRequest) -> HttpResponse:
+    """Interface: renders the matched content page."""
+
+    subreddit_groups = build_dashboard_groups(request.user)
+    has_matches = any(group.matches for group in subreddit_groups)
+    context = {
+        "subreddit_groups": subreddit_groups,
+        "has_matches": has_matches,
+        "dash_active_nav": "matches",
+    }
+    if request.headers.get("HX-Request"):
+        return render(request, "tracking/_matches_content.html", context)
+    return render(request, "tracking/matches.html", context)
+
+
+@login_required
+@require_GET
 def dashboard_settings(request: HttpRequest) -> HttpResponse:
     """Interface: renders the consolidated dashboard settings page."""
 
@@ -74,15 +93,14 @@ def dashboard_settings(request: HttpRequest) -> HttpResponse:
     preference, _ = EmailNotificationPreference.objects.get_or_create(user=request.user)
     notification_form = EmailNotificationPreferenceForm(initial={"cadence": preference.cadence})
 
-    return render(
-        request,
-        "dash/settings.html",
-        {
-            "dash_active_nav": "settings",
-            "profile_form": profile_form,
-            "notification_form": notification_form,
-        },
-    )
+    context = {
+        "dash_active_nav": "settings",
+        "profile_form": profile_form,
+        "notification_form": notification_form,
+    }
+    if request.headers.get("HX-Request"):
+        return render(request, "dash/_settings_content.html", context)
+    return render(request, "dash/settings.html", context)
 
 
 @login_required
@@ -134,7 +152,7 @@ def dashboard_settings_notifications(request: HttpRequest) -> HttpResponse:
 
 
 def _dashboard_context(request: HttpRequest, *, form: MonitorBatchForm | None = None) -> dict[str, object]:
-    subreddit_groups = build_dashboard_groups(request.user)
+    subreddit_groups = build_dashboard_groups(request.user, include_matches=False)
     return {
         "form": form or MonitorBatchForm(),
         "active_monitor_count": sum(len(group.monitors) for group in subreddit_groups),

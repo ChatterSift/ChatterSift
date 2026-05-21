@@ -1,7 +1,7 @@
 {% load i18n %}
 
-<article class="border border-base-300 bg-base-100 rounded-box">
-  <header class="flex flex-col gap-3 border-b border-base-300 p-4 sm:flex-row sm:items-center sm:justify-between">
+<article class="border border-base-300 bg-base-100 rounded-box p-4">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <div>
       <h2 class="font-display text-xl font-semibold tracking-tight">r/{{ group.subreddit }}</h2>
       <p class="text-sm text-base-content/70">
@@ -27,42 +27,5 @@
         </form>
       {% endfor %}
     </div>
-  </header>
-  <div class="divide-y divide-base-300">
-    {% if group.matches %}
-      {% for match in group.matches %}
-        <article class="p-4">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div class="min-w-0 space-y-1">
-              <a class="link link-primary font-semibold break-words"
-                 href="{{ match.permalink }}"
-                 target="_blank"
-                 rel="noopener noreferrer">
-                {% if match.title %}
-                  {{ match.title|truncatechars:140 }}
-                {% else %}
-                  {{ match.body|truncatechars:140 }}
-                {% endif %}
-              </a>
-              {% if match.body and match.title %}
-                <p class="text-sm text-base-content/70 break-words">{{ match.body|truncatechars:180 }}</p>
-              {% endif %}
-              <time class="block text-xs text-base-content/60"
-                    datetime="{{ match.occurred_at|date:'c' }}">
-                {{ match.occurred_at|date:"M j, Y H:i" }}
-              </time>
-            </div>
-            <div class="flex shrink-0 flex-wrap gap-1 sm:justify-end">
-              <span class="badge badge-info badge-outline">{{ match.item_type_label }}</span>
-              {% for keyword in match.keywords %}<span class="badge badge-accent badge-outline">{{ keyword }}</span>{% endfor %}
-            </div>
-          </div>
-        </article>
-      {% endfor %}
-    {% else %}
-      <div class="p-4">
-        <p class="text-sm text-base-content/70">{% translate "No matches yet" %}</p>
-      </div>
-    {% endif %}
   </div>
 </article>

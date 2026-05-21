@@ -61,7 +61,12 @@ def upsert_keyword_monitors(*, user: User, subreddit: str, keywords: Iterable[st
     return monitors
 
 
-def build_dashboard_groups(user: User, *, match_limit_per_subreddit: int = 25) -> list[DashboardSubredditGroup]:
+def build_dashboard_groups(
+    user: User,
+    *,
+    include_matches: bool = True,
+    match_limit_per_subreddit: int = 25,
+) -> list[DashboardSubredditGroup]:
     """Interface: returns current-user active monitor groups with aggregate matches."""
 
     active_monitors = list(Monitor.objects.filter(user=user, is_active=True).order_by("subreddit", "keyword"))
@@ -69,11 +74,14 @@ def build_dashboard_groups(user: User, *, match_limit_per_subreddit: int = 25) -
     for monitor in active_monitors:
         monitors_by_subreddit.setdefault(monitor.subreddit, []).append(monitor)
 
-    matches_by_subreddit = _build_dashboard_matches_by_subreddit(
-        user=user,
-        subreddits=monitors_by_subreddit.keys(),
-        match_limit_per_subreddit=match_limit_per_subreddit,
-    )
+    if include_matches:
+        matches_by_subreddit = _build_dashboard_matches_by_subreddit(
+            user=user,
+            subreddits=monitors_by_subreddit.keys(),
+            match_limit_per_subreddit=match_limit_per_subreddit,
+        )
+    else:
+        matches_by_subreddit = {}
 
     return [
         DashboardSubredditGroup(

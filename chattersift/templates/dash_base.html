@@ -3,57 +3,164 @@
 {% load static i18n %}
 
 {% block body %}
-  <div class="drawer lg:drawer-open">
-    <input id="dash-drawer" type="checkbox" class="drawer-toggle" />
-    <!-- Main content area -->
-    <div class="drawer-content flex flex-col min-h-screen bg-base-200">
-      <!-- Top bar -->
-      <div class="navbar bg-base-100 border-b border-base-300 px-4 lg:px-6 gap-2">
-        <label for="dash-drawer"
-               class="btn btn-ghost btn-square drawer-button lg:hidden"
-               aria-label="{% translate 'Open menu' %}">
+  <!-- Floating pill nav -->
+  <header class="sticky top-3 z-50 mx-auto w-full max-w-5xl px-4 lg:px-6">
+    <div class="relative flex h-14 items-center justify-between rounded-full bg-base-100/80 backdrop-blur-lg text-base-content ring-1 ring-base-300 shadow-sm pl-4 pr-2.5"
+         x-data="{ mobileOpen: false, activeNav: '{{ dash_active_nav }}', init() { window.addEventListener('popstate', () => this.syncFromUrl()); document.body.addEventListener('htmx:pushedIntoHistory', () => this.syncFromUrl()); }, syncFromUrl() { const path = window.location.pathname; if (path.includes('/settings/')) this.activeNav = 'settings'; else if (path.includes('/matches/')) this.activeNav = 'matches'; else this.activeNav = 'monitors'; } }">
+      <!-- Left: brand -->
+      <a href="{% url 'tracking:dashboard' %}" class="text-base shrink-0 pl-2">
+        <span class="brand">Chatter<span class="brand-sift">Sift</span></span>
+      </a>
+      <!-- Center: nav links -->
+      <nav class="hidden sm:flex absolute inset-0 items-center justify-center gap-1 text-sm pointer-events-none">
+        <a href="{% url 'tracking:dashboard' %}"
+           hx-get="{% url 'tracking:dashboard' %}"
+           hx-target="#dash-content"
+           hx-swap="innerHTML transition:true"
+           hx-push-url="true"
+           hx-indicator="#global-loading"
+           @click="activeNav = 'monitors'; mobileOpen = false"
+           class="pointer-events-auto rounded-full px-4 py-1.5 font-medium transition"
+           :class="activeNav === 'monitors' ? 'bg-base-300 text-base-content' : 'text-base-content/50 hover:bg-base-200 hover:text-base-content'">
+          {% translate "Monitors" %}
+        </a>
+        <a href="{% url 'tracking:matches' %}"
+           hx-get="{% url 'tracking:matches' %}"
+           hx-target="#dash-content"
+           hx-swap="innerHTML transition:true"
+           hx-push-url="true"
+           hx-indicator="#global-loading"
+           @click="activeNav = 'matches'; mobileOpen = false"
+           class="pointer-events-auto rounded-full px-4 py-1.5 font-medium transition"
+           :class="activeNav === 'matches' ? 'bg-base-300 text-base-content' : 'text-base-content/50 hover:bg-base-200 hover:text-base-content'">
+          {% translate "Matches" %}
+        </a>
+        <a href="{% url 'tracking:dashboard_settings' %}"
+           hx-get="{% url 'tracking:dashboard_settings' %}"
+           hx-target="#dash-content"
+           hx-swap="innerHTML transition:true"
+           hx-push-url="true"
+           hx-indicator="#global-loading"
+           @click="activeNav = 'settings'; mobileOpen = false"
+           class="pointer-events-auto rounded-full px-4 py-1.5 font-medium transition"
+           :class="activeNav === 'settings' ? 'bg-base-300 text-base-content' : 'text-base-content/50 hover:bg-base-200 hover:text-base-content'">
+          {% translate "Settings" %}
+        </a>
+      </nav>
+      <!-- Right: loading + mobile toggle -->
+      <div class="flex items-center gap-1 shrink-0">
+        <div id="global-loading"
+             class="htmx-indicator inline-flex items-center gap-2 text-base-content/50 mr-2">
+          <span class="loading loading-spinner loading-sm" aria-hidden="true"></span>
+        </div>
+        <!-- Sign out -->
+        <a href="{% url 'account_logout' %}"
+           class="hidden sm:flex items-center justify-center rounded-full w-8 h-8 text-base-content/50 transition hover:bg-base-200 hover:text-base-content"
+           title="{% translate 'Sign Out' %}">
+          <svg xmlns="http://www.w3.org/2000/svg"
+               class="h-4 w-4"
+               fill="none"
+               viewBox="0 0 24 24"
+               stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </a>
+        <!-- Mobile toggle -->
+        <button class="sm:hidden btn btn-ghost btn-sm btn-circle text-base-content/70 hover:text-base-content"
+                @click="mobileOpen = !mobileOpen"
+                aria-label="{% translate 'Toggle menu' %}">
           <svg xmlns="http://www.w3.org/2000/svg"
                class="h-5 w-5"
                fill="none"
                viewBox="0 0 24 24"
-               stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" />
+               stroke="currentColor"
+               stroke-width="1.5"
+               stroke-linecap="round"
+               stroke-linejoin="round">
+            <template x-if="!mobileOpen">
+              <g>
+              <path d="M4 6h16" />
+              <path d="M4 12h16" />
+              <path d="M4 18h16" />
+              </g>
+            </template>
+            <template x-if="mobileOpen">
+              <g>
+              <path d="M18 6L6 18" />
+              <path d="M6 6l12 12" />
+              </g>
+            </template>
           </svg>
-        </label>
-        <div class="flex-1">
-          {% block dash_topbar %}
-          {% endblock dash_topbar %}
-        </div>
-        <div id="global-loading"
-             class="htmx-indicator inline-flex items-center gap-2 text-primary">
-          <span class="loading loading-spinner loading-sm" aria-hidden="true"></span>
-          <span class="text-sm font-medium hidden sm:inline">{% translate "Loading" %}</span>
-        </div>
-        {% include "dash/_user_menu.html" %}
+        </button>
       </div>
-      <!-- Messages -->
-      {% if messages %}
-        <div class="px-4 lg:px-6 pt-4">
-          {% for message in messages %}
-            <div role="alert"
-                 class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} mb-2">
-              <span>{{ message }}</span>
-            </div>
-          {% endfor %}
+      <!-- Mobile dropdown -->
+      <div x-show="mobileOpen"
+           x-cloak
+           x-transition:enter="transition ease-out duration-150"
+           x-transition:enter-start="opacity-0 -translate-y-1"
+           x-transition:enter-end="opacity-100 translate-y-0"
+           x-transition:leave="transition ease-in duration-100"
+           x-transition:leave-start="opacity-100 translate-y-0"
+           x-transition:leave-end="opacity-0 -translate-y-1"
+           @click.outside="mobileOpen = false"
+           class="absolute left-4 right-4 top-16 rounded-2xl bg-base-100/80 backdrop-blur-lg ring-1 ring-base-300 shadow-lg p-4 sm:hidden">
+        <nav class="flex flex-col gap-1 text-sm">
+          <a href="{% url 'tracking:dashboard' %}"
+             hx-get="{% url 'tracking:dashboard' %}"
+             hx-target="#dash-content"
+             hx-swap="innerHTML transition:true"
+             hx-push-url="true"
+             hx-indicator="#global-loading"
+             @click="activeNav = 'monitors'; mobileOpen = false"
+             class="rounded-lg px-3 py-2.5 transition"
+             :class="activeNav === 'monitors' ? 'bg-base-300 text-base-content' : 'text-base-content/50 hover:bg-base-200 hover:text-base-content'">
+            {% translate "Monitors" %}
+          </a>
+          <a href="{% url 'tracking:matches' %}"
+             hx-get="{% url 'tracking:matches' %}"
+             hx-target="#dash-content"
+             hx-swap="innerHTML transition:true"
+             hx-push-url="true"
+             hx-indicator="#global-loading"
+             @click="activeNav = 'matches'; mobileOpen = false"
+             class="rounded-lg px-3 py-2.5 transition"
+             :class="activeNav === 'matches' ? 'bg-base-300 text-base-content' : 'text-base-content/50 hover:bg-base-200 hover:text-base-content'">
+            {% translate "Matches" %}
+          </a>
+          <a href="{% url 'tracking:dashboard_settings' %}"
+             hx-get="{% url 'tracking:dashboard_settings' %}"
+             hx-target="#dash-content"
+             hx-swap="innerHTML transition:true"
+             hx-push-url="true"
+             hx-indicator="#global-loading"
+             @click="activeNav = 'settings'; mobileOpen = false"
+             class="rounded-lg px-3 py-2.5 transition"
+             :class="activeNav === 'settings' ? 'bg-base-300 text-base-content' : 'text-base-content/50 hover:bg-base-200 hover:text-base-content'">
+            {% translate "Settings" %}
+          </a>
+          <div class="border-t border-base-300 my-2"></div>
+          <a href="{% url 'account_logout' %}"
+             class="rounded-lg px-3 py-2.5 text-base-content/50 transition hover:bg-base-200 hover:text-base-content">
+            {% translate "Sign Out" %}
+          </a>
+        </nav>
+      </div>
+    </div>
+  </header>
+  <!-- Messages -->
+  {% if messages %}
+    <div class="max-w-5xl mx-auto px-4 lg:px-6 pt-4">
+      {% for message in messages %}
+        <div role="alert"
+             class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} mb-2">
+          <span>{{ message }}</span>
         </div>
-      {% endif %}
-      <!-- Page content -->
-      <main class="flex-1 p-4 lg:p-6">
-        {% block dash_content %}
-        {% endblock dash_content %}
-      </main>
+      {% endfor %}
     </div>
-    <!-- Sidebar -->
-    <div class="drawer-side z-40">
-      <label for="dash-drawer"
-             aria-label="{% translate 'Close menu' %}"
-             class="drawer-overlay"></label>
-      {% include "dash/_sidebar_nav.html" %}
-    </div>
-  </div>
+  {% endif %}
+  <!-- Page content -->
+  <main id="dash-content" class="max-w-5xl mx-auto px-4 lg:px-6 py-6">
+    {% block dash_content %}
+    {% endblock dash_content %}
+  </main>
 {% endblock body %}

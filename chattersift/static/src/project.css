@@ -66,10 +66,47 @@
   --noise: 0;
 }
 
-/* Typography: DM Sans (body) + JetBrains Mono (code/accents) */
+/* Typography: DM Sans (body) + Sora (display/brand) + JetBrains Mono (code) */
 @theme {
   --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-display: "Sora", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Brand wordmark */
+.brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  position: relative;
+}
+
+.brand-sift {
+  color: var(--color-primary);
+  position: relative;
+}
+
+.brand-sift::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 1px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+a:hover .brand-sift::after,
+.brand:hover .brand-sift::after {
+  transform: scaleX(1);
 }
 
 /* Remove double focus outline and add primary border on focus */
