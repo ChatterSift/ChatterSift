@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
+from django.http import QueryDict
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
 from django.template.loader import render_to_string
@@ -19,6 +20,7 @@ from .forms import MonitorBatchForm
 from .models import Monitor
 from .services import add_keyword_to_subreddit
 from .services import build_dashboard_groups
+from .services import build_matches_feed
 from .services import delete_single_monitor
 from .services import delete_subreddit_group
 from .services import toggle_subreddit_group
@@ -32,7 +34,7 @@ if TYPE_CHECKING:
 @login_required
 @require_GET
 def dashboard(request: HttpRequest) -> HttpResponse:
-    """Interface: renders the authenticated Reddit keyword dashboard."""
+    """Renders the authenticated Reddit keyword dashboard."""
 
     context = _dashboard_context(request)
     context["dash_active_nav"] = "monitors"
@@ -44,7 +46,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_POST
 def monitor_create(request: HttpRequest) -> HttpResponse:
-    """Interface: creates or reactivates keyword monitors for one subreddit."""
+    """Creates or reactivates keyword monitors for one subreddit."""
 
     form = MonitorBatchForm(request.POST)
     is_valid = form.is_valid()
@@ -63,7 +65,7 @@ def monitor_create(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_POST
 def monitor_add_keyword(request: HttpRequest, subreddit: str) -> HttpResponse:
-    """Interface: adds a single keyword to an existing subreddit group."""
+    """Adds a single keyword to an existing subreddit group."""
 
     form = KeywordAddForm(request.POST)
     if form.is_valid():
@@ -79,7 +81,7 @@ def monitor_add_keyword(request: HttpRequest, subreddit: str) -> HttpResponse:
 @login_required
 @require_POST
 def monitor_delete(request: HttpRequest, pk: int) -> HttpResponse:
-    """Interface: permanently deletes one keyword monitor."""
+    """Permanently deletes one keyword monitor."""
 
     delete_single_monitor(user=request.user, pk=pk)
     return _render_dashboard_content(request, form=MonitorBatchForm())
@@ -88,7 +90,7 @@ def monitor_delete(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 @require_POST
 def monitor_deactivate(request: HttpRequest, pk: int) -> HttpResponse:
-    """Interface: deactivates one current-user monitor without deleting history."""
+    """Deactivates one current-user monitor without deleting history."""
 
     monitor = get_object_or_404(Monitor, pk=pk, user=request.user)
     if monitor.is_active:
@@ -101,7 +103,7 @@ def monitor_deactivate(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 @require_POST
 def monitor_toggle_group(request: HttpRequest, subreddit: str) -> HttpResponse:
-    """Interface: pauses or resumes all monitors for a subreddit."""
+    """Pauses or resumes all monitors for a subreddit."""
 
     toggle_subreddit_group(user=request.user, subreddit=subreddit)
     return _render_dashboard_content(request, form=MonitorBatchForm())
@@ -110,7 +112,7 @@ def monitor_toggle_group(request: HttpRequest, subreddit: str) -> HttpResponse:
 @login_required
 @require_POST
 def monitor_delete_group(request: HttpRequest, subreddit: str) -> HttpResponse:
-    """Interface: permanently deletes all monitors for a subreddit."""
+    """Permanently deletes all monitors for a subreddit."""
 
     delete_subreddit_group(user=request.user, subreddit=subreddit)
     return _render_dashboard_content(request, form=MonitorBatchForm())
@@ -119,7 +121,7 @@ def monitor_delete_group(request: HttpRequest, subreddit: str) -> HttpResponse:
 @login_required
 @require_POST
 def monitor_update_cadence(request: HttpRequest, subreddit: str) -> HttpResponse:
-    """Interface: updates notification cadence for all monitors in a subreddit group."""
+    """Updates notification cadence for all monitors in a subreddit group."""
 
     form = CadenceForm(request.POST)
     if form.is_valid():
@@ -135,13 +137,27 @@ def monitor_update_cadence(request: HttpRequest, subreddit: str) -> HttpResponse
 @login_required
 @require_GET
 def matches(request: HttpRequest) -> HttpResponse:
-    """Interface: renders the matched content page."""
+    """Renders the matched content page."""
 
-    subreddit_groups = build_dashboard_groups(request.user)
-    has_matches = any(group.matches for group in subreddit_groups)
+    selected_subreddit = request.GET.get("subreddit")
+    page = _positive_int_or_default(request.GET.get("page"), default=1)
+    feed = build_matches_feed(request.user, subreddit=selected_subreddit, page=page)
+
+    previous_page_url = _matches_query_url(
+        subreddit=feed.selected_subreddit,
+        page=feed.page - 1,
+    )
+    next_page_url = _matches_query_url(
+        subreddit=feed.selected_subreddit,
+        page=feed.page + 1,
+    )
+
     context = {
-        "subreddit_groups": subreddit_groups,
-        "has_matches": has_matches,
+        "feed": feed,
+        "has_matches": bool(feed.items),
+        "has_monitors": bool(feed.subreddit_options),
+        "previous_page_url": previous_page_url,
+        "next_page_url": next_page_url,
         "dash_active_nav": "matches",
     }
     if request.headers.get("HX-Request"):
@@ -152,7 +168,7 @@ def matches(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_GET
 def dashboard_settings(request: HttpRequest) -> HttpResponse:
-    """Interface: renders the consolidated dashboard settings page."""
+    """Renders the consolidated dashboard settings page."""
 
     profile_form = UserProfileForm(instance=request.user)
 
@@ -168,7 +184,7 @@ def dashboard_settings(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_POST
 def dashboard_settings_profile(request: HttpRequest) -> HttpResponse:
-    """Interface: handles profile name update, returns HTMX partial."""
+    """Handles profile name update, returns HTMX partial."""
 
     form = UserProfileForm(request.POST, instance=request.user)
     saved = False
@@ -209,3 +225,25 @@ def _render_dashboard_content(
         request=request,
     )
     return HttpResponse(html)
+
+
+def _matches_query_url(*, subreddit: str | None, page: int) -> str:
+    params = QueryDict(mutable=True)
+    if subreddit:
+        params["subreddit"] = subreddit
+    if page > 1:
+        params["page"] = str(page)
+    query_string = params.urlencode()
+    if not query_string:
+        return ""
+    return f"?{query_string}"
+
+
+def _positive_int_or_default(raw_value: str | None, *, default: int) -> int:
+    if raw_value is None:
+        return default
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default

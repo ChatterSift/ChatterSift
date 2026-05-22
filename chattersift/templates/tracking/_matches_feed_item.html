@@ -1,0 +1,22 @@
+{% load i18n %}
+
+<article class="border border-base-300 bg-base-100 p-4 rounded-box">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div class="min-w-0 space-y-2">
+      <div class="flex flex-wrap gap-2">
+        <span class="badge badge-primary badge-outline">r/{{ item.subreddit }}</span>
+        <span class="badge badge-info badge-outline">{{ item.item_type_label }}</span>
+        {% for keyword in item.keywords %}<span class="badge badge-accent badge-outline">{{ keyword }}</span>{% endfor %}
+      </div>
+      <a class="link link-primary font-semibold break-words"
+         href="{{ item.permalink }}"
+         target="_blank"
+         rel="noopener noreferrer">{{ item.title_html }}</a>
+      {% if item.body_html %}<p class="text-sm text-base-content/70 break-words">{{ item.body_html }}</p>{% endif %}
+      <time class="block text-xs text-base-content/60"
+            datetime="{{ item.occurred_at|date:'c' }}">
+        {{ item.occurred_at|date:"M j, Y H:i" }}
+      </time>
+    </div>
+  </div>
+</article>

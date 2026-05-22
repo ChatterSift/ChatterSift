@@ -19,6 +19,7 @@ pytestmark = pytest.mark.django_db
 
 EXPECTED_CREATED_MONITOR_COUNT = 2
 EXPECTED_MATCH_BADGE_COUNT = 2
+DEFAULT_MATCHES_PAGE_SIZE = 25
 
 
 def test_dashboard_requires_login(client) -> None:
@@ -179,8 +180,9 @@ def test_matches_page_shows_matched_content(client, user) -> None:
     response = client.get(reverse("tracking:matches"))
 
     content = response.content.decode()
-    assert "Django Postgres deployment" in content
+    assert "Django <mark>Postgres</mark> deployment" in content
     assert "https://www.reddit.com/r/django/comments/t3_shared/example/" in content
+    assert '<span class="badge badge-primary badge-outline">r/django</span>' in content
     assert content.count("badge badge-accent badge-outline") == EXPECTED_MATCH_BADGE_COUNT
 
 
@@ -204,6 +206,88 @@ def test_matches_page_shows_empty_state(client, user) -> None:
     response = client.get(reverse("tracking:matches"))
 
     assert "No matches yet" in response.content.decode()
+
+
+def test_matches_page_renders_subreddit_filter_options(client, user) -> None:
+    Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    Monitor.objects.create(user=user, subreddit="python", keyword="asyncio")
+    client.force_login(user)
+
+    response = client.get(reverse("tracking:matches"))
+
+    content = response.content.decode()
+    assert 'name="subreddit"' in content
+    assert "All subreddits" in content
+    assert '<option value="django"' in content
+    assert '<option value="python"' in content
+
+
+def test_matches_page_selected_subreddit_filter_is_applied(client, user) -> None:
+    django_monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    python_monitor = Monitor.objects.create(user=user, subreddit="python", keyword="asyncio")
+    _create_match(django_monitor, reddit_item_id="t3_django", title="Django Postgres deployment")
+    _create_match(python_monitor, reddit_item_id="t3_python", title="Python asyncio news")
+    client.force_login(user)
+
+    response = client.get(reverse("tracking:matches"), {"subreddit": "python"})
+
+    content = response.content.decode()
+    assert "Python <mark>asyncio</mark> news" in content
+    assert "Django <mark>Postgres</mark> deployment" not in content
+    assert '<option value="python" selected>' in content
+
+
+def test_matches_page_unknown_subreddit_filter_resets_to_all(client, user) -> None:
+    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    _create_match(monitor, reddit_item_id="t3_django", title="Django Postgres deployment")
+    client.force_login(user)
+
+    response = client.get(reverse("tracking:matches"), {"subreddit": "missing"})
+
+    content = response.content.decode()
+    assert "Django <mark>Postgres</mark> deployment" in content
+    assert '<option value="missing" selected>' not in content
+
+
+def test_matches_page_pagination_preserves_subreddit_filter(client, user) -> None:
+    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    for index in range(DEFAULT_MATCHES_PAGE_SIZE + 1):
+        _create_match(
+            monitor,
+            reddit_item_id=f"t3_item_{index}",
+            title=f"Django item {index}",
+            body="postgres mention",
+        )
+    client.force_login(user)
+
+    response = client.get(reverse("tracking:matches"), {"subreddit": "django"})
+
+    content = response.content.decode()
+    assert "?subreddit=django&amp;page=2" in content
+
+
+def test_matches_page_htmx_returns_partial(client, user) -> None:
+    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    _create_match(monitor, reddit_item_id="t3_partial", title="Django Postgres deployment")
+    client.force_login(user)
+
+    response = client.get(reverse("tracking:matches"), HTTP_HX_REQUEST="true")
+
+    templates = [template.name for template in response.templates]
+    assert response.status_code == HTTPStatus.OK
+    assert "tracking/_matches_content.html" in templates
+    assert "tracking/matches.html" not in templates
+
+
+def test_matches_page_no_matches_for_selected_subreddit_state(client, user) -> None:
+    django_monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    Monitor.objects.create(user=user, subreddit="python", keyword="asyncio")
+    _create_match(django_monitor, reddit_item_id="t3_django", title="Django Postgres deployment")
+    client.force_login(user)
+
+    response = client.get(reverse("tracking:matches"), {"subreddit": "python"})
+
+    assert "No matches for this subreddit" in response.content.decode()
 
 
 def _create_match(
