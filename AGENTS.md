@@ -75,3 +75,4 @@ This is HTMX/server-rendered first. Django Ninja APIs are opt-in via `CHATTERSIF
 - Use DaisyUI semantic color classes (`bg-primary`, `text-error`, etc.) instead of raw Tailwind colors.
 - Use DaisyUI component classes (`btn`, `badge`, `alert`, `loading`, etc.) for consistent styling.
 - Do not include CSS classes in `forms.py`; use `render_field` in templates instead.
+- Use {# ... #} instead of <!-- ... --> for comments in django templates.
