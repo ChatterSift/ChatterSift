@@ -1,0 +1,13 @@
+{# Interface: floating toast stack for django.contrib.messages. #}
+{# Mounted once near <body> root. Container is always present (id="toast-stack") so #}
+{# HTMX responses can append toasts via hx-swap-oob="beforeend:#toast-stack". #}
+<div id="toast-stack"
+     class="pointer-events-none fixed inset-x-0 top-4 z-[60] mx-auto flex w-[calc(100%-2rem)] max-w-md flex-col gap-2 sm:top-6"
+     aria-live="polite"
+     aria-atomic="false">
+  {% if messages %}
+    {% for message in messages %}
+      {% include "includes/_toast.html" with message=message %}
+    {% endfor %}
+  {% endif %}
+</div>

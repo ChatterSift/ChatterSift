@@ -143,17 +143,6 @@
       </div>
     </div>
   </header>
-  {# Messages #}
-  {% if messages %}
-    <div class="max-w-5xl mx-auto px-4 lg:px-6 pt-4">
-      {% for message in messages %}
-        <div role="alert"
-             class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} mb-2">
-          <span>{{ message }}</span>
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
   {# Loading indicator: centered in content area, outside backdrop-filter ancestor #}
   <div id="global-loading"
        class="htmx-indicator fixed inset-x-0 bottom-0 top-20 z-40 flex items-center justify-center pointer-events-none">

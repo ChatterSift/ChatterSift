@@ -1,7 +1,7 @@
 {% load allauth %}
 
 {% if attrs.type == "textarea" %}
-  <div class="mb-5">
+  <div class="mb-6">
     <label class="block text-sm font-medium text-base-content mb-1.5"
            for="{{ attrs.id }}">{% slot label %}{% endslot %}</label>
     <textarea {% if attrs.required %}required{% endif %}
@@ -15,7 +15,7 @@
               class="textarea textarea-bordered border-base-300 w-full bg-base-100 focus:border-primary focus:outline-none">{% slot value %}{% endslot %}</textarea>
   </div>
 {% elif attrs.type == "radio" %}
-  <div class="mb-5">
+  <div class="mb-4">
     <label class="flex items-center gap-3 cursor-pointer" for="{{ attrs.id }}">
       <input {% if attrs.required %}required{% endif %}
              {% if attrs.disabled %}disabled{% endif %}
@@ -32,7 +32,7 @@
     </label>
   </div>
 {% elif attrs.type == "checkbox" %}
-  <div class="mb-5">
+  <div class="mb-4">
     <label class="flex items-center gap-3 cursor-pointer" for="{{ attrs.id }}">
       <input {% if attrs.required %}required{% endif %}
              {% if attrs.disabled %}disabled{% endif %}
@@ -47,8 +47,8 @@
     </label>
   </div>
 {% else %}
-  <div class="mb-5">
-    <label class="block text-sm font-medium text-base-content mb-1.5"
+  <div class="mb-6">
+    <label class="block text-sm font-medium text-base-content mb-2"
            for="{{ attrs.id }}">{% slot label %}{% endslot %}</label>
     <input {% if attrs.required %}required{% endif %}
            {% if attrs.disabled %}disabled{% endif %}

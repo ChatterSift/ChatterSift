@@ -8,18 +8,19 @@
   {% endblock head_title %}
 {% endblock title %}
 {% block body %}
-  <div class="flex justify-center min-h-screen py-8">
-    <div class="w-full max-w-md px-4">
-      {% if messages %}
-        {% for message in messages %}
-          <div role="alert"
-               class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} mb-2">
-            <span>{{ message }}</span>
-          </div>
-        {% endfor %}
-      {% endif %}
-      {% block content %}
-      {% endblock content %}
+  <div class="min-h-screen bg-base-200/40 flex items-start justify-center px-4 py-12 sm:py-20">
+    <div class="w-full max-w-md">
+      <div class="flex justify-center mb-6">
+        <a href="{% url 'home' %}" class="text-2xl">
+          <span class="brand">Chatter<span class="brand-sift">Sift</span></span>
+        </a>
+      </div>
+      <section class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body p-6 sm:p-8">
+          {% block content %}
+          {% endblock content %}
+        </div>
+      </section>
       {% block extra_body %}
       {% endblock extra_body %}
     </div>

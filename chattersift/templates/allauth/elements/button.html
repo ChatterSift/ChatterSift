@@ -6,12 +6,14 @@
   {% if attrs.id %}id="{{ attrs.id }}"{% endif %}
   {% if attrs.name %}name="{{ attrs.name }}"{% endif %}
   {% if attrs.type %}type="{{ attrs.type }}"{% endif %}
-  class="btn w-full
+  class="btn btn-sm
+{% if 'prominent' in attrs.tags %}w-full btn-md
+{% endif %}
 {% if 'outline' in attrs.tags %}btn-outline btn-primary
 {% elif 'success' in attrs.tags %}btn-success
 {% elif 'warning' in attrs.tags %}btn-warning
-{% elif 'secondary' in attrs.tags %}btn-secondary
-{% elif 'danger' in attrs.tags %}btn-error
+{% elif 'secondary' in attrs.tags %}btn-ghost border border-base-300
+{% elif 'danger' in attrs.tags %}btn-ghost border border-error/40 text-error hover:bg-error/10 hover:border-error
 {% elif 'primary' in attrs.tags %}btn-primary
 {% else %}btn-primary
 {% endif %}"

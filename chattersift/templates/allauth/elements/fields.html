@@ -5,7 +5,7 @@
   {% if field.is_hidden %}
     {{ field }}
   {% else %}
-    <div class="mb-5">
+    <div class="mb-6">
       {% if field.field.widget.input_type == "checkbox" %}
         <label class="flex items-center gap-3 cursor-pointer"
                for="{{ field.id_for_label }}">
@@ -13,11 +13,11 @@
           <span class="text-sm text-base-content">{{ field.label }}</span>
         </label>
       {% else %}
-        <label class="block text-sm font-medium text-base-content mb-1.5"
+        <label class="block text-sm font-medium text-base-content mb-2"
                for="{{ field.id_for_label }}">{{ field.label }}</label>
         {{ field }}
       {% endif %}
-      {% if field.help_text %}<div class="text-xs text-base-content/50 mt-1.5">{{ field.help_text }}</div>{% endif %}
+      {% if field.help_text %}<div class="text-xs text-base-content/50 mt-2">{{ field.help_text }}</div>{% endif %}
     </div>
   {% endif %}
 {% endfor %}

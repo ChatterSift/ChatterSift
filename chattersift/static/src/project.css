@@ -117,6 +117,62 @@ a:hover .brand-sift::after,
   border-color: var(--color-primary);
 }
 
+/* Style unclassed Django form widgets rendered inside allauth forms */
+.allauth-form input[type="text"],
+.allauth-form input[type="email"],
+.allauth-form input[type="password"],
+.allauth-form input[type="number"],
+.allauth-form input[type="url"],
+.allauth-form input[type="tel"],
+.allauth-form input[type="search"],
+.allauth-form input:not([type]),
+.allauth-form textarea,
+.allauth-form select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  background-color: var(--color-base-100);
+  color: var(--color-base-content);
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.allauth-form input[type="text"]:focus,
+.allauth-form input[type="email"]:focus,
+.allauth-form input[type="password"]:focus,
+.allauth-form input[type="number"]:focus,
+.allauth-form input[type="url"]:focus,
+.allauth-form input[type="tel"]:focus,
+.allauth-form input[type="search"]:focus,
+.allauth-form input:not([type]):focus,
+.allauth-form textarea:focus,
+.allauth-form select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 15%, transparent);
+}
+
+.allauth-form input[type="text"]::placeholder,
+.allauth-form input[type="email"]::placeholder,
+.allauth-form input[type="password"]::placeholder,
+.allauth-form textarea::placeholder {
+  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+}
+
+.allauth-form textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.allauth-form input[type="checkbox"],
+.allauth-form input[type="radio"] {
+  accent-color: var(--color-primary);
+  width: 1rem;
+  height: 1rem;
+}
+
 [x-cloak] {
   display: none !important;
 }
@@ -162,4 +218,20 @@ a:hover .brand-sift::after,
 
 .terminal-cursor {
   animation: terminal-blink 1s step-end infinite;
+}
+
+/* Toast countdown: drives auto-dismiss via animationend; paused on hover. */
+@keyframes toast-countdown {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+.toast-countdown {
+  animation-name: toast-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+.toast-paused {
+  animation-play-state: paused;
 }

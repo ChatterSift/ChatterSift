@@ -47,6 +47,8 @@
     {% endblock javascript %}
   </head>
   <body class="bg-base-100 text-base-content font-sans {% block bodyclass %}{% endblock bodyclass %}">
+    {# Floating toast stack: mounted outside {% block body %} so layout overrides inherit it. #}
+    {% include "includes/messages.html" %}
     {% block body %}
       {# Navbar #}
       <div class="navbar bg-base-100 border-b border-base-300 px-4">
@@ -123,17 +125,6 @@
         <span class="loading loading-spinner loading-lg" aria-hidden="true"></span>
         <span class="font-medium">{% translate "Loading" %}</span>
       </div>
-      {# Messages #}
-      {% if messages %}
-        <div class="max-w-5xl mx-auto px-4 mt-4">
-          {% for message in messages %}
-            <div role="alert"
-                 class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %} mb-2">
-              <span>{{ message }}</span>
-            </div>
-          {% endfor %}
-        </div>
-      {% endif %}
       {# Content #}
       <div class="max-w-5xl mx-auto px-4 py-6">
         {% block main %}

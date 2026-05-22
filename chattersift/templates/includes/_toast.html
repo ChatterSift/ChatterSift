@@ -1,0 +1,18 @@
+{# Interface: renders a single Django messages.Message as a reactive toast. #}
+{# Expects `message` in context. Tag drives accent color, icon, label, and timeout. #}
+{# Literal Tailwind classes appear below so the v4 JIT picks them up at build time. #}
+{% load i18n %}
+
+{% with tag=message.level_tag|default:"info" %}
+  {% if tag == "success" %}
+    {% include "includes/_toast_card.html" with message=message strip="bg-success" ring="ring-success/15" tag_text="text-success" icon_bg="bg-success/10" icon_text="text-success" bar="bg-success/70" focus="focus:ring-success/40" label="Done" duration=4500 svg="check" %}
+  {% elif tag == "warning" %}
+    {% include "includes/_toast_card.html" with message=message strip="bg-warning" ring="ring-warning/15" tag_text="text-warning" icon_bg="bg-warning/10" icon_text="text-warning" bar="bg-warning/70" focus="focus:ring-warning/40" label="Heads up" duration=6500 svg="warn" %}
+  {% elif tag == "error" %}
+    {% include "includes/_toast_card.html" with message=message strip="bg-error" ring="ring-error/15" tag_text="text-error" icon_bg="bg-error/10" icon_text="text-error" bar="bg-error/70" focus="focus:ring-error/40" label="Error" duration=8000 svg="x" %}
+  {% elif tag == "debug" %}
+    {% include "includes/_toast_card.html" with message=message strip="bg-info" ring="ring-info/15" tag_text="text-info" icon_bg="bg-info/10" icon_text="text-info" bar="bg-info/70" focus="focus:ring-info/40" label="Debug" duration=5000 svg="info" %}
+  {% else %}
+    {% include "includes/_toast_card.html" with message=message strip="bg-info" ring="ring-info/15" tag_text="text-info" icon_bg="bg-info/10" icon_text="text-info" bar="bg-info/70" focus="focus:ring-info/40" label="Info" duration=5000 svg="info" %}
+  {% endif %}
+{% endwith %}

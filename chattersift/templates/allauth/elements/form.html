@@ -2,10 +2,10 @@
 
 <form method="{{ attrs.method }}"
       {% if attrs.action %}action="{{ attrs.action }}"{% endif %}
-      class="space-y-1">
+      class="allauth-form space-y-6">
   {% slot body %}
 {% endslot %}
-<div class="pt-2">
+<div class="pt-4 flex flex-wrap items-center gap-3">
   {% slot actions %}
 {% endslot %}
 </div>
