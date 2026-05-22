@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 @login_required
 @require_http_methods(["GET", "POST"])
 def notification_settings(request: HttpRequest) -> HttpResponse:
-    """Interface: renders the legacy notification settings route."""
+    """Renders the legacy notification settings route."""
 
     return render(
         request,

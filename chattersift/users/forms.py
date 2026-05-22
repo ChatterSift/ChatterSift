@@ -31,7 +31,7 @@ class UserAdminCreationForm(admin_forms.AdminUserCreationForm):
 
 
 class UserProfileForm(forms.ModelForm):
-    """Interface: edits the user's display name from the dashboard settings page."""
+    """Edits the user's display name from the dashboard settings page."""
 
     class Meta:
         model = User

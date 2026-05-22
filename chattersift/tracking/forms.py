@@ -15,7 +15,7 @@ KEYWORD_MAX_LENGTH = 255
 
 
 class MonitorBatchForm(forms.Form):
-    """Interface: validates one subreddit plus a case-insensitive keyword set."""
+    """Validates one subreddit plus a case-insensitive keyword set."""
 
     subreddit = forms.CharField(max_length=SUBREDDIT_MAX_LENGTH)
     keywords = forms.CharField()
@@ -68,7 +68,7 @@ class MonitorBatchForm(forms.Form):
 
 
 class KeywordAddForm(forms.Form):
-    """Interface: validates a single keyword to add to an existing subreddit group."""
+    """Validates a single keyword to add to an existing subreddit group."""
 
     keyword = forms.CharField(max_length=KEYWORD_MAX_LENGTH)
 
@@ -80,6 +80,6 @@ class KeywordAddForm(forms.Form):
 
 
 class CadenceForm(forms.Form):
-    """Interface: validates a notification cadence selection."""
+    """Validates a notification cadence selection."""
 
     cadence = forms.ChoiceField(choices=NotificationCadence)

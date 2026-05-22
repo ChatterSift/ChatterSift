@@ -14,7 +14,7 @@ class NotificationCadence(models.TextChoices):
 
 
 class EmailNotificationPreference(models.Model):
-    """Interface: stores one user's email notification delivery baseline."""
+    """Stores one user's email notification delivery baseline."""
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     started_at = models.DateTimeField(null=True, blank=True)
@@ -30,7 +30,7 @@ class EmailNotificationPreference(models.Model):
 
 
 class EmailNotificationSchedule(models.Model):
-    """Interface: stores one user's due time for one monitor notification cadence."""
+    """Stores one user's due time for one monitor notification cadence."""
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     cadence = models.CharField(
@@ -56,7 +56,7 @@ class EmailNotificationSchedule(models.Model):
 
 
 class EmailMatchDelivery(models.Model):
-    """Interface: records one successfully emailed Reddit item for one user."""
+    """Records one successfully emailed Reddit item for one user."""
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     reddit_item_id = models.CharField(max_length=255)

@@ -39,8 +39,7 @@ User = get_user_model()
 class UserMatchAlert:
     """Aggregated alert payload for one user and one Reddit item.
 
-    Interface:
-        Delivery code should use this payload when a user has several monitor
+    Delivery code should use this payload when a user has several monitor
         rows matching the same Reddit item. Match rows stay per monitor for
         persistence, while alert payloads collapse duplicates for display.
     """
@@ -59,7 +58,7 @@ class UserMatchAlert:
 
 @dataclass(frozen=True, kw_only=True)
 class RenderedUserMatchAlert:
-    """Interface: display-safe email content for one aggregated Reddit item."""
+    """Display-safe email content for one aggregated Reddit item."""
 
     user_id: int
     subreddit: str
@@ -76,13 +75,13 @@ class RenderedUserMatchAlert:
 
 
 def update_email_notification_preference(*, user: User) -> EmailNotificationPreference:
-    """Interface: ensures the user's email delivery baseline exists."""
+    """Ensures the user's email delivery baseline exists."""
 
     return ensure_email_notifications_started(user=user)
 
 
 def enqueue_immediate_match_notifications(match_ids: Iterable[int]) -> None:
-    """Interface: enqueues one immediate delivery task after the current transaction commits."""
+    """Enqueues one immediate delivery task after the current transaction commits."""
 
     ids = sorted(set(match_ids))
     if not ids:
@@ -141,8 +140,7 @@ def send_due_email_digests() -> int:
 def build_user_match_alerts(matches: Iterable[Match]) -> list[UserMatchAlert]:
     """Return user/item alert payloads aggregated from per-monitor matches.
 
-    Interface:
-        Input matches must have their related Monitor available. Callers with a
+    Input matches must have their related Monitor available. Callers with a
         queryset should prefer ``select_related("monitor")`` to avoid per-row
         database lookups. The output groups rows by user, subreddit, and Reddit
         item so delivery can send one alert with all matched keywords.
@@ -202,7 +200,7 @@ def _matched_keywords(matches: Iterable[Match]) -> tuple[str, ...]:
 
 
 def render_user_match_alerts(alerts: Iterable[UserMatchAlert]) -> list[RenderedUserMatchAlert]:
-    """Interface: adds HTML-safe keyword highlighting for email rendering."""
+    """Adds HTML-safe keyword highlighting for email rendering."""
 
     return [
         RenderedUserMatchAlert(

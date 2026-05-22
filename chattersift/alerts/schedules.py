@@ -25,7 +25,7 @@ CADENCE_INTERVALS: dict[str, timedelta] = {
 
 
 def ensure_email_notifications_started(*, user: User) -> EmailNotificationPreference:
-    """Interface: creates the user's email baseline when a monitor opts into email."""
+    """Creates the user's email baseline when a monitor opts into email."""
 
     now = timezone.now()
     preference, _ = EmailNotificationPreference.objects.get_or_create(user=user)
@@ -36,7 +36,7 @@ def ensure_email_notifications_started(*, user: User) -> EmailNotificationPrefer
 
 
 def ensure_email_notification_schedule(*, user: User, cadence: str) -> EmailNotificationSchedule | None:
-    """Interface: creates the due schedule for one periodic monitor cadence."""
+    """Creates the due schedule for one periodic monitor cadence."""
 
     if cadence not in CADENCE_INTERVALS:
         return None
@@ -51,7 +51,7 @@ def ensure_email_notification_schedule(*, user: User, cadence: str) -> EmailNoti
 
 
 def ensure_email_delivery_state(*, user: User, cadence: str) -> None:
-    """Interface: ensures delivery state exists when a monitor cadence enables email."""
+    """Ensures delivery state exists when a monitor cadence enables email."""
 
     if cadence == NotificationCadence.OFF:
         return
@@ -61,6 +61,6 @@ def ensure_email_delivery_state(*, user: User, cadence: str) -> None:
 
 
 def next_send_at(cadence: str, *, now: datetime) -> datetime:
-    """Interface: returns the next due time for a periodic notification cadence."""
+    """Returns the next due time for a periodic notification cadence."""
 
     return now + CADENCE_INTERVALS[cadence]

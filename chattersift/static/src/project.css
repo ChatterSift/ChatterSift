@@ -1,4 +1,4 @@
-/* Interface: Tailwind CLI compiles this source file into chattersift/static/css/project.css. */
+/* Tailwind CLI compiles this source file into chattersift/static/css/project.css. */
 @import "tailwindcss";
 
 @plugin "daisyui" {
