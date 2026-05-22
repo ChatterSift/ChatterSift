@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import pytest
+from django.contrib.auth import get_user_model
 
 from chattersift.users.tests.factories import UserFactory
 
-if TYPE_CHECKING:
-    from chattersift.users.models import User
+User = get_user_model()
 
 
 @pytest.fixture(autouse=True)

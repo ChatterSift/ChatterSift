@@ -1,9 +1,10 @@
 from io import StringIO
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 
-from chattersift.users.models import User
+User = get_user_model()
 
 
 @pytest.mark.django_db

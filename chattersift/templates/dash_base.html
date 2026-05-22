@@ -3,15 +3,15 @@
 {% load static i18n %}
 
 {% block body %}
-  <!-- Floating pill nav -->
+  {# Floating pill nav #}
   <header class="sticky top-3 z-50 mx-auto w-full max-w-5xl px-4 lg:px-6">
     <div class="relative flex h-14 items-center justify-between rounded-full bg-base-100/80 backdrop-blur-lg text-base-content ring-1 ring-base-300 shadow-sm pl-4 pr-2.5"
          x-data="{ mobileOpen: false, activeNav: '{{ dash_active_nav }}', init() { window.addEventListener('popstate', () => this.syncFromUrl()); document.body.addEventListener('htmx:pushedIntoHistory', () => this.syncFromUrl()); }, syncFromUrl() { const path = window.location.pathname; if (path.includes('/settings/')) this.activeNav = 'settings'; else if (path.includes('/matches/')) this.activeNav = 'matches'; else this.activeNav = 'monitors'; } }">
-      <!-- Left: brand -->
+      {# Left: brand #}
       <a href="{% url 'tracking:dashboard' %}" class="text-base shrink-0 pl-2">
         <span class="brand">Chatter<span class="brand-sift">Sift</span></span>
       </a>
-      <!-- Center: nav links -->
+      {# Center: nav links #}
       <nav class="hidden sm:flex absolute inset-0 items-center justify-center gap-1 text-sm pointer-events-none">
         <a href="{% url 'tracking:dashboard' %}"
            hx-get="{% url 'tracking:dashboard' %}"
@@ -47,9 +47,9 @@
           {% translate "Settings" %}
         </a>
       </nav>
-      <!-- Right: mobile toggle + sign out -->
+      {# Right: mobile toggle + sign out #}
       <div class="flex items-center gap-1 shrink-0">
-        <!-- Sign out -->
+        {# Sign out #}
         <a href="{% url 'account_logout' %}"
            class="hidden sm:flex items-center justify-center rounded-full w-8 h-8 text-base-content/50 transition hover:bg-base-200 hover:text-base-content"
            title="{% translate 'Sign Out' %}">
@@ -61,7 +61,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
         </a>
-        <!-- Mobile toggle -->
+        {# Mobile toggle #}
         <button class="sm:hidden btn btn-ghost btn-sm btn-circle text-base-content/70 hover:text-base-content"
                 @click="mobileOpen = !mobileOpen"
                 aria-label="{% translate 'Toggle menu' %}">
@@ -89,7 +89,7 @@
           </svg>
         </button>
       </div>
-      <!-- Mobile dropdown -->
+      {# Mobile dropdown #}
       <div x-show="mobileOpen"
            x-cloak
            x-transition:enter="transition ease-out duration-150"
@@ -143,7 +143,7 @@
       </div>
     </div>
   </header>
-  <!-- Messages -->
+  {# Messages #}
   {% if messages %}
     <div class="max-w-5xl mx-auto px-4 lg:px-6 pt-4">
       {% for message in messages %}
@@ -154,13 +154,13 @@
       {% endfor %}
     </div>
   {% endif %}
-  <!-- Loading indicator: centered in content area, outside backdrop-filter ancestor -->
+  {# Loading indicator: centered in content area, outside backdrop-filter ancestor #}
   <div id="global-loading"
        class="htmx-indicator fixed inset-x-0 bottom-0 top-20 z-40 flex items-center justify-center pointer-events-none">
     <span class="loading loading-spinner text-primary size-20"
           aria-hidden="true"></span>
   </div>
-  <!-- Page content -->
+  {# Page content #}
   <main id="dash-content" class="max-w-5xl mx-auto px-4 lg:px-6 pt-16 pb-6">
     {% block dash_content %}
     {% endblock dash_content %}

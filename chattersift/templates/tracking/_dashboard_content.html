@@ -1,34 +1,51 @@
 {% load i18n %}
 
-<div id="dashboard-content" class="space-y-8">
-  <section class="grid gap-6 lg:grid-cols-[minmax(0,24rem)_1fr]">
-    {% include "tracking/_monitor_form.html" %}
-    <div class="space-y-3">
-      <div>
-        <h1 class="font-display text-2xl font-bold tracking-tight">{% translate "Monitors" %}</h1>
-        <p class="text-sm text-base-content/70">{% translate "Track Reddit keywords by subreddit." %}</p>
-      </div>
-      <div class="stats stats-vertical sm:stats-horizontal border border-base-300 bg-base-100 w-full">
-        <div class="stat">
-          <div class="stat-title">{% translate "Subreddits" %}</div>
-          <div class="stat-value text-primary">{{ subreddit_groups|length }}</div>
-        </div>
-        <div class="stat">
-          <div class="stat-title">{% translate "Active keywords" %}</div>
-          <div class="stat-value text-primary">{{ active_monitor_count }}</div>
-        </div>
-      </div>
+<div id="dashboard-content"
+     class="space-y-6"
+     x-data="{ showForm: {{ show_monitor_form|yesno:'true,false' }} }">
+  {# Header with add button #}
+  <section class="flex items-center justify-between">
+    <div>
+      <h1 class="font-display text-2xl font-bold tracking-tight">{% translate "Monitors" %}</h1>
+      <p class="text-sm text-base-content/60">{% translate "Track Reddit keywords by subreddit." %}</p>
     </div>
+    <button class="btn btn-sm gap-1.5"
+            @click="showForm = !showForm"
+            :class="showForm ? 'btn-ghost' : 'btn-primary'">
+      <svg xmlns="http://www.w3.org/2000/svg"
+           class="h-4 w-4 transition-transform duration-200"
+           :class="showForm && 'rotate-45'"
+           fill="none"
+           viewBox="0 0 24 24"
+           stroke="currentColor"
+           stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+      </svg>
+      <span x-text="showForm ? '{% translate "Cancel" %}' : '{% translate "New monitor" %}'"></span>
+    </button>
   </section>
+  {# Collapsible new monitor form #}
+  {% include "tracking/_monitor_form.html" %}
+  {# Monitor groups #}
   <section class="space-y-4">
     {% if subreddit_groups %}
       {% for group in subreddit_groups %}
         {% include "tracking/_subreddit_group.html" with group=group %}
       {% endfor %}
     {% else %}
-      <div class="border border-base-300 bg-base-100 p-6 rounded-box">
+      <div class="border border-base-300 bg-base-100 p-8 rounded-box text-center">
+        <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-base-200">
+          <svg xmlns="http://www.w3.org/2000/svg"
+               class="h-6 w-6 text-base-content/40"
+               fill="none"
+               viewBox="0 0 24 24"
+               stroke="currentColor"
+               stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          </svg>
+        </div>
         <p class="font-semibold">{% translate "No monitors yet" %}</p>
-        <p class="text-sm text-base-content/70">
+        <p class="text-sm text-base-content/60 mt-1">
           {% translate "Create a subreddit keyword monitor to start collecting matches." %}
         </p>
       </div>

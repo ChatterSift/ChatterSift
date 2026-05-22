@@ -1,7 +1,8 @@
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from ninja import ModelSchema
 
-from chattersift.users.models import User
+User = get_user_model()
 
 
 class UpdateUserSchema(ModelSchema):

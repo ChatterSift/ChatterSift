@@ -9,6 +9,7 @@ import pytest
 from allauth.account.models import EmailAddress
 from django.utils import timezone
 
+from chattersift.alerts.models import EmailNotificationSchedule
 from chattersift.alerts.models import NotificationCadence
 from chattersift.alerts.services import build_user_match_alerts
 from chattersift.alerts.services import render_user_match_alerts
@@ -90,20 +91,23 @@ def test_render_user_match_alerts_highlights_keywords_case_insensitively() -> No
 
 
 def test_update_preference_sets_first_opt_in_baseline_once(user) -> None:
-    first = update_email_notification_preference(user=user, cadence=NotificationCadence.TEN_MINUTES)
+    first = update_email_notification_preference(user=user)
     baseline = first.started_at
 
-    update_email_notification_preference(user=user, cadence=NotificationCadence.OFF)
-    second = update_email_notification_preference(user=user, cadence=NotificationCadence.THIRTY_MINUTES)
+    second = update_email_notification_preference(user=user)
 
     assert second.started_at == baseline
-    assert second.next_send_at is not None
 
 
 def test_send_immediate_email_digests_queues_new_item_once(monkeypatch, user) -> None:
     _verify_email(user)
-    update_email_notification_preference(user=user, cadence=NotificationCadence.IMMEDIATE)
-    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    update_email_notification_preference(user=user)
+    monitor = Monitor.objects.create(
+        user=user,
+        subreddit="django",
+        keyword="postgres",
+        notification_cadence=NotificationCadence.IMMEDIATE,
+    )
     match = _create_match(monitor, reddit_item_id="t3_immediate")
     queued_signatures = []
     monkeypatch.setattr("chattersift.alerts.services.current_app.signature", _signature_factory(queued_signatures))
@@ -118,19 +122,61 @@ def test_send_immediate_email_digests_queues_new_item_once(monkeypatch, user) ->
     assert queued_signatures[0][1].kwargs["reddit_item_ids"] == ["t3_immediate"]
 
 
+def test_send_immediate_email_digests_ignores_non_immediate_monitors(monkeypatch, user) -> None:
+    _verify_email(user)
+    update_email_notification_preference(user=user)
+    monitor = Monitor.objects.create(
+        user=user,
+        subreddit="django",
+        keyword="postgres",
+        notification_cadence=NotificationCadence.DAILY,
+    )
+    match = _create_match(monitor, reddit_item_id="t3_daily")
+    queued_signatures = []
+    monkeypatch.setattr("chattersift.alerts.services.current_app.signature", _signature_factory(queued_signatures))
+
+    assert send_immediate_email_digests([match.pk]) == 0
+    assert queued_signatures == []
+
+
+def test_send_due_email_digests_retries_pending_immediate_monitor(monkeypatch, user) -> None:
+    _verify_email(user)
+    update_email_notification_preference(user=user)
+    monitor = Monitor.objects.create(
+        user=user,
+        subreddit="django",
+        keyword="postgres",
+        notification_cadence=NotificationCadence.IMMEDIATE,
+    )
+    _create_match(monitor, reddit_item_id="t3_retry")
+    queued_signatures = []
+    monkeypatch.setattr("chattersift.alerts.services.current_app.signature", _signature_factory(queued_signatures))
+
+    assert send_due_email_digests() == 1
+    assert queued_signatures[0][1].kwargs["reddit_item_ids"] == ["t3_retry"]
+
+
 def test_send_due_email_digests_respects_first_opt_in_baseline(monkeypatch, user) -> None:
     _verify_email(user)
-    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    monitor = Monitor.objects.create(
+        user=user,
+        subreddit="django",
+        keyword="postgres",
+        notification_cadence=NotificationCadence.TEN_MINUTES,
+    )
     historical_match = _create_match(monitor, reddit_item_id="t3_old")
-    preference = update_email_notification_preference(user=user, cadence=NotificationCadence.TEN_MINUTES)
+    preference = update_email_notification_preference(user=user)
     assert preference.started_at is not None
     started_at = cast("datetime", preference.started_at)
     Match.objects.filter(pk=historical_match.pk).update(
         created_at=started_at - timedelta(minutes=1),
     )
     _create_match(monitor, reddit_item_id="t3_new")
-    preference.next_send_at = timezone.now() - timedelta(seconds=1)
-    preference.save(update_fields=["next_send_at", "updated_at"])
+    EmailNotificationSchedule.objects.create(
+        user=user,
+        cadence=NotificationCadence.TEN_MINUTES,
+        next_send_at=timezone.now() - timedelta(seconds=1),
+    )
     queued_signatures = []
     monkeypatch.setattr("chattersift.alerts.services.current_app.signature", _signature_factory(queued_signatures))
 
@@ -141,18 +187,26 @@ def test_send_due_email_digests_respects_first_opt_in_baseline(monkeypatch, user
     assert "t3_new" in queued_signatures[0][0].kwargs["message"]
 
 
-def test_off_preference_keeps_pending_matches_for_reenable(monkeypatch, user) -> None:
+def test_off_monitor_keeps_pending_matches_for_reenable(monkeypatch, user) -> None:
     _verify_email(user)
-    preference = update_email_notification_preference(user=user, cadence=NotificationCadence.TEN_MINUTES)
-    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    update_email_notification_preference(user=user)
+    monitor = Monitor.objects.create(
+        user=user,
+        subreddit="django",
+        keyword="postgres",
+        notification_cadence=NotificationCadence.OFF,
+    )
     _create_match(monitor, reddit_item_id="t3_pending")
-    update_email_notification_preference(user=user, cadence=NotificationCadence.OFF)
 
     assert send_due_email_digests() == 0
 
-    preference = update_email_notification_preference(user=user, cadence=NotificationCadence.TEN_MINUTES)
-    preference.next_send_at = timezone.now() - timedelta(seconds=1)
-    preference.save(update_fields=["next_send_at", "updated_at"])
+    monitor.notification_cadence = NotificationCadence.TEN_MINUTES
+    monitor.save(update_fields=["notification_cadence", "updated_at"])
+    EmailNotificationSchedule.objects.create(
+        user=user,
+        cadence=NotificationCadence.TEN_MINUTES,
+        next_send_at=timezone.now() - timedelta(seconds=1),
+    )
     queued_signatures = []
     monkeypatch.setattr("chattersift.alerts.services.current_app.signature", _signature_factory(queued_signatures))
 

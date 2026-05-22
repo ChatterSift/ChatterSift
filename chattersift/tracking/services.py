@@ -4,7 +4,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from typing import cast
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
+
+from chattersift.alerts.models import NotificationCadence
+from chattersift.alerts.schedules import ensure_email_delivery_state
 
 from .models import Match
 from .models import Monitor
@@ -13,7 +17,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from chattersift.reddit.models import RedditItem
-    from chattersift.users.models import User
+
+User = get_user_model()
 
 
 @dataclass(frozen=True)
@@ -36,10 +41,18 @@ class DashboardSubredditGroup:
     subreddit: str
     monitors: tuple[Monitor, ...]
     matches: tuple[DashboardMatch, ...]
+    notification_cadence: str
+    is_paused: bool
 
 
 @transaction.atomic
-def upsert_keyword_monitors(*, user: User, subreddit: str, keywords: Iterable[str]) -> list[Monitor]:
+def upsert_keyword_monitors(
+    *,
+    user: User,
+    subreddit: str,
+    keywords: Iterable[str],
+    cadence: str = NotificationCadence.THIRTY_MINUTES,
+) -> list[Monitor]:
     """Interface: creates or reactivates one Monitor row for each keyword."""
 
     monitors: list[Monitor] = []
@@ -52,13 +65,85 @@ def upsert_keyword_monitors(*, user: User, subreddit: str, keywords: Iterable[st
             .first()
         )
         if monitor is None:
-            monitor = Monitor.objects.create(user=user, subreddit=normalized_subreddit, keyword=keyword)
+            monitor = Monitor.objects.create(
+                user=user,
+                subreddit=normalized_subreddit,
+                keyword=keyword,
+                notification_cadence=cadence,
+            )
+            ensure_email_delivery_state(user=user, cadence=cadence)
         elif not monitor.is_active:
             monitor.is_active = True
-            monitor.save(update_fields=["is_active", "updated_at"])
+            monitor.notification_cadence = cadence
+            monitor.save(update_fields=["is_active", "notification_cadence", "updated_at"])
+            ensure_email_delivery_state(user=user, cadence=cadence)
         monitors.append(monitor)
 
     return monitors
+
+
+def add_keyword_to_subreddit(*, user: User, subreddit: str, keyword: str) -> Monitor:
+    """Interface: adds a single keyword monitor to an existing subreddit group."""
+
+    normalized = subreddit.casefold()
+    monitor = Monitor.objects.filter(user=user, subreddit=normalized, keyword__iexact=keyword).first()
+    if monitor is None:
+        # Copy cadence from existing monitors in this group
+        existing = Monitor.objects.filter(user=user, subreddit=normalized).first()
+        cadence = existing.notification_cadence if existing else NotificationCadence.THIRTY_MINUTES
+        monitor = Monitor.objects.create(
+            user=user,
+            subreddit=normalized,
+            keyword=keyword,
+            notification_cadence=cadence,
+        )
+        ensure_email_delivery_state(user=user, cadence=cadence)
+    elif not monitor.is_active:
+        monitor.is_active = True
+        monitor.save(update_fields=["is_active", "updated_at"])
+    return monitor
+
+
+def delete_single_monitor(*, user: User, pk: int) -> None:
+    """Interface: permanently deletes one monitor and its match history."""
+
+    Monitor.objects.filter(pk=pk, user=user).delete()
+
+
+def delete_subreddit_group(*, user: User, subreddit: str) -> None:
+    """Interface: permanently deletes all monitors for a subreddit."""
+
+    Monitor.objects.filter(user=user, subreddit=subreddit.casefold()).delete()
+
+
+@transaction.atomic
+def toggle_subreddit_group(*, user: User, subreddit: str) -> bool:
+    """Interface: pauses or resumes all monitors for a subreddit. Returns new is_active state."""
+
+    normalized = subreddit.casefold()
+    monitors = list(
+        Monitor.objects.select_for_update().filter(user=user, subreddit=normalized),
+    )
+    if not monitors:
+        return False
+
+    # If any are active, pause all; otherwise resume all
+    any_active = any(m.is_active for m in monitors)
+    new_state = not any_active
+    Monitor.objects.filter(user=user, subreddit=normalized).update(
+        is_active=new_state,
+    )
+    return new_state
+
+
+@transaction.atomic
+def update_group_cadence(*, user: User, subreddit: str, cadence: str) -> None:
+    """Interface: sets the notification cadence for all monitors in a subreddit group."""
+
+    Monitor.objects.filter(user=user, subreddit=subreddit.casefold()).update(
+        notification_cadence=cadence,
+    )
+    ensure_email_delivery_state(user=user, cadence=cadence)
 
 
 def build_dashboard_groups(
@@ -69,9 +154,9 @@ def build_dashboard_groups(
 ) -> list[DashboardSubredditGroup]:
     """Interface: returns current-user active monitor groups with aggregate matches."""
 
-    active_monitors = list(Monitor.objects.filter(user=user, is_active=True).order_by("subreddit", "keyword"))
+    all_monitors = list(Monitor.objects.filter(user=user).order_by("subreddit", "keyword"))
     monitors_by_subreddit: dict[str, list[Monitor]] = {}
-    for monitor in active_monitors:
+    for monitor in all_monitors:
         monitors_by_subreddit.setdefault(monitor.subreddit, []).append(monitor)
 
     if include_matches:
@@ -88,6 +173,8 @@ def build_dashboard_groups(
             subreddit=subreddit,
             monitors=tuple(monitors),
             matches=tuple(matches_by_subreddit.get(subreddit, [])),
+            notification_cadence=cast("str", monitors[0].notification_cadence) if monitors else NotificationCadence.OFF,
+            is_paused=all(not m.is_active for m in monitors),
         )
         for subreddit, monitors in monitors_by_subreddit.items()
     ]

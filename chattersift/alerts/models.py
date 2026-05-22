@@ -14,22 +14,42 @@ class NotificationCadence(models.TextChoices):
 
 
 class EmailNotificationPreference(models.Model):
-    """Interface: stores one user's email notification cadence and delivery schedule."""
+    """Interface: stores one user's email notification delivery baseline."""
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    cadence = models.CharField(
-        max_length=16,
-        choices=NotificationCadence,
-        default=NotificationCadence.OFF,
-    )
     started_at = models.DateTimeField(null=True, blank=True)
     last_sent_at = models.DateTimeField(null=True, blank=True)
-    next_send_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["user_id"]
+
+    def __str__(self) -> str:
+        return str(self.user_id)
+
+
+class EmailNotificationSchedule(models.Model):
+    """Interface: stores one user's due time for one monitor notification cadence."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    cadence = models.CharField(
+        max_length=16,
+        choices=NotificationCadence,
+    )
+    next_send_at = models.DateTimeField(db_index=True)
+    last_sent_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["user_id", "cadence"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "cadence"],
+                name="unique_email_schedule_per_user_cadence",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.user_id}:{self.cadence}"

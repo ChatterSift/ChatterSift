@@ -1,56 +1,81 @@
 {% load i18n %}
 
-<form method="post"
-      action="{% url 'tracking:monitor_create' %}"
-      hx-post="{% url 'tracking:monitor_create' %}"
-      hx-target="#dashboard-content"
-      hx-swap="outerHTML"
-      hx-indicator="#global-loading"
-      class="border border-base-300 bg-base-100 p-5 rounded-box space-y-4"
-      x-data="{ keywords: '' }">
-  {% csrf_token %}
-  <div>
-    <h2 class="font-display text-lg font-semibold tracking-tight">{% translate "New monitor" %}</h2>
-  </div>
-  {% if form.non_field_errors %}
-    <div role="alert" class="alert alert-error">
-      <span>{{ form.non_field_errors|join:", " }}</span>
+<div x-show="showForm"
+     x-cloak
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0 -translate-y-2"
+     x-transition:enter-end="opacity-100 translate-y-0"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100 translate-y-0"
+     x-transition:leave-end="opacity-0 -translate-y-2">
+  <form method="post"
+        action="{% url 'tracking:monitor_create' %}"
+        hx-post="{% url 'tracking:monitor_create' %}"
+        hx-target="#dashboard-content"
+        hx-swap="outerHTML"
+        hx-indicator="#global-loading"
+        class="border border-base-300 bg-base-100 rounded-box overflow-hidden"
+        x-data="{ keywords: '' }">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div role="alert" class="alert alert-error rounded-none">
+        <span>{{ form.non_field_errors|join:", " }}</span>
+      </div>
+    {% endif %}
+    <div class="p-5 space-y-4">
+      {# Subreddit #}
+      <div class="form-control gap-1">
+        <label class="label" for="id_subreddit">
+          <span class="label-text font-medium">{% translate "Subreddit" %}</span>
+        </label>
+        <input id="id_subreddit"
+               name="subreddit"
+               type="text"
+               maxlength="100"
+               value="{{ form.subreddit.value|default_if_none:'' }}"
+               class="input input-bordered w-full"
+               placeholder="r/django"
+               required />
+        {% if form.subreddit.errors %}<p class="text-sm text-error mt-1">{{ form.subreddit.errors|join:", " }}</p>{% endif %}
+      </div>
+      {# Keywords #}
+      <div class="form-control gap-1">
+        <label class="label" for="id_keywords">
+          <span class="label-text font-medium">{% translate "Keywords" %}</span>
+        </label>
+        <textarea id="id_keywords"
+                  name="keywords"
+                  class="textarea textarea-bordered min-h-24 w-full focus:border-primary focus:outline-none"
+                  maxlength="4096"
+                  placeholder="{% translate 'One keyword per line, or comma-separated' %}"
+                  required
+                  x-model="keywords">{{ form.keywords.value|default_if_none:'' }}</textarea>
+        {% if form.keywords.errors %}<p class="text-sm text-error mt-1">{{ form.keywords.errors|join:", " }}</p>{% endif %}
+        <div class="flex flex-wrap gap-1.5 mt-1"
+             x-show="keywords.split(/[\n,]+/).map((k) => k.trim()).filter(Boolean).length"
+             x-cloak>
+          <template x-for="kw in [...new Map(keywords.split(/[\n,]+/).map((v) => v.trim()).filter(Boolean).map((v) => [v.toLocaleLowerCase(), v])).values()]"
+                    :key="kw.toLocaleLowerCase()">
+            <span class="badge badge-primary badge-outline badge-sm" x-text="kw"></span>
+          </template>
+        </div>
+      </div>
+      {# Notification cadence #}
+      <div class="form-control gap-1">
+        <label class="label" for="id_cadence">
+          <span class="label-text font-medium">{% translate "Notification frequency" %}</span>
+        </label>
+        <select id="id_cadence" name="cadence" class="select select-bordered w-full">
+          {% for value, label in cadence_choices %}
+            <option value="{{ value }}"
+                    {% if value == form.cadence.value|default:"30m" %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
-  {% endif %}
-  <div class="form-control gap-2">
-    <label class="label" for="id_subreddit">
-      <span class="label-text">{% translate "Subreddit" %}</span>
-    </label>
-    <input id="id_subreddit"
-           name="subreddit"
-           type="text"
-           maxlength="100"
-           value="{{ form.subreddit.value|default_if_none:'' }}"
-           class="input input-bordered w-full"
-           placeholder="r/django"
-           required />
-    {% if form.subreddit.errors %}<p class="text-sm text-error">{{ form.subreddit.errors|join:", " }}</p>{% endif %}
-  </div>
-  <div class="form-control gap-2">
-    <label class="label" for="id_keywords">
-      <span class="label-text">{% translate "Keywords" %}</span>
-    </label>
-    <textarea id="id_keywords"
-              name="keywords"
-              class="textarea textarea-bordered min-h-32 w-full"
-              maxlength="4096"
-              placeholder="{% translate 'postgres&#10;celery&#10;htmx' %}"
-              required
-              x-model="keywords">{{ form.keywords.value|default_if_none:'' }}</textarea>
-    {% if form.keywords.errors %}<p class="text-sm text-error">{{ form.keywords.errors|join:", " }}</p>{% endif %}
-    <div class="flex flex-wrap gap-2"
-         x-show="keywords.split(/[\n,]+/).map((keyword) => keyword.trim()).filter(Boolean).length"
-         x-cloak>
-      <template x-for="keyword in [...new Map(keywords.split(/[\n,]+/).map((value) => value.trim()).filter(Boolean).map((value) => [value.toLocaleLowerCase(), value])).values()]"
-                :key="keyword.toLocaleLowerCase()">
-        <span class="badge badge-primary badge-outline" x-text="keyword"></span>
-      </template>
+    {# Footer #}
+    <div class="border-t border-base-300 px-5 py-3 bg-base-200/50 flex justify-end">
+      <button type="submit" class="btn btn-primary btn-sm">{% translate "Create monitor" %}</button>
     </div>
-  </div>
-  <button type="submit" class="btn btn-primary w-full">{% translate "Create monitors" %}</button>
-</form>
+  </form>
+</div>

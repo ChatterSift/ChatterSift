@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from chattersift.users.forms import UserAdminCreationForm
 
-if TYPE_CHECKING:
-    from chattersift.users.models import User
+User = get_user_model()
 
 
 class TestUserAdminCreationForm:

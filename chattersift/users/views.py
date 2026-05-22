@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.urls import reverse
@@ -10,10 +11,10 @@ from django.views.generic import DetailView
 from django.views.generic import RedirectView
 from django.views.generic import UpdateView
 
-from chattersift.users.models import User
-
 if TYPE_CHECKING:
     from django.db.models import QuerySet
+
+User = get_user_model()
 
 
 class UserDetailView(LoginRequiredMixin, DetailView):

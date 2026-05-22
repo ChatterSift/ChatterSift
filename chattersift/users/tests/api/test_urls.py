@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from django.contrib.auth import get_user_model
 from django.urls import resolve
 from django.urls import reverse
 
-if TYPE_CHECKING:
-    from chattersift.users.models import User
+User = get_user_model()
 
 
 def test_user_detail(user: User):

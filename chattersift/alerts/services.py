@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import TYPE_CHECKING
 from typing import cast
 
 from allauth.account.models import EmailAddress
 from celery import current_app
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Exists
 from django.db.models import OuterRef
@@ -22,13 +22,17 @@ from chattersift.tracking.models import Match
 
 from .models import EmailMatchDelivery
 from .models import EmailNotificationPreference
+from .models import EmailNotificationSchedule
 from .models import NotificationCadence
+from .schedules import CADENCE_INTERVALS
+from .schedules import ensure_email_notifications_started
+from .schedules import next_send_at
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from datetime import datetime
 
-    from chattersift.users.models import User
+User = get_user_model()
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -71,25 +75,10 @@ class RenderedUserMatchAlert:
     occurred_at: datetime
 
 
-CADENCE_INTERVALS: dict[str, timedelta] = {
-    NotificationCadence.TEN_MINUTES: timedelta(minutes=10),
-    NotificationCadence.THIRTY_MINUTES: timedelta(minutes=30),
-    NotificationCadence.ONE_HOUR: timedelta(hours=1),
-    NotificationCadence.DAILY: timedelta(days=1),
-}
+def update_email_notification_preference(*, user: User) -> EmailNotificationPreference:
+    """Interface: ensures the user's email delivery baseline exists."""
 
-
-def update_email_notification_preference(*, user: User, cadence: str) -> EmailNotificationPreference:
-    """Interface: updates the user's cadence while preserving the first opt-in baseline."""
-
-    now = timezone.now()
-    preference, _ = EmailNotificationPreference.objects.get_or_create(user=user)
-    preference.cadence = cadence
-    if cadence != NotificationCadence.OFF and preference.started_at is None:
-        preference.started_at = now
-    preference.next_send_at = _next_send_at(cadence, now=now)
-    preference.save(update_fields=["cadence", "started_at", "next_send_at", "updated_at"])
-    return preference
+    return ensure_email_notifications_started(user=user)
 
 
 def enqueue_immediate_match_notifications(match_ids: Iterable[int]) -> None:
@@ -110,9 +99,10 @@ def send_immediate_email_digests(match_ids: Iterable[int]) -> int:
     matches = Match.objects.filter(pk__in=match_ids).select_related("monitor", "monitor__user")
     user_ids = {match.monitor.user_id for match in matches if match.monitor.user_id is not None}
     sent_count = 0
-    for preference in _eligible_preferences(user_ids=user_ids, cadences=[NotificationCadence.IMMEDIATE]):
+    for preference in _eligible_preferences(user_ids=user_ids):
         pending_matches = _pending_matches_for_user(
             preference,
+            monitor_cadences=[NotificationCadence.IMMEDIATE],
             match_ids=match_ids,
         )
         sent_count += int(_send_preference_digest(preference, pending_matches))
@@ -123,21 +113,28 @@ def send_due_email_digests() -> int:
     """Send due periodic digests and retry any pending immediate notifications."""
 
     now = timezone.now()
-    due_preferences = EmailNotificationPreference.objects.exclude(cadence=NotificationCadence.OFF).filter(
-        started_at__isnull=False,
+    due_schedules = EmailNotificationSchedule.objects.filter(
+        cadence__in=CADENCE_INTERVALS,
+        next_send_at__lte=now,
+        user__emailnotificationpreference__started_at__isnull=False,
     )
     sent_count = 0
-    for preference in due_preferences.select_related("user"):
-        if preference.cadence != NotificationCadence.IMMEDIATE and (
-            preference.next_send_at is None or preference.next_send_at > now
-        ):
-            continue
-
-        pending_matches = _pending_matches_for_user(preference)
+    for preference in _preferences_with_monitor_cadence(cadence=NotificationCadence.IMMEDIATE):
+        pending_matches = _pending_matches_for_user(
+            preference,
+            monitor_cadences=[NotificationCadence.IMMEDIATE],
+        )
         sent_count += int(_send_preference_digest(preference, pending_matches, now=now))
-        if preference.cadence != NotificationCadence.IMMEDIATE:
-            preference.next_send_at = _next_send_at(preference.cadence, now=now)
-            preference.save(update_fields=["next_send_at", "updated_at"])
+
+    for schedule in due_schedules.select_related("user", "user__emailnotificationpreference"):
+        preference = schedule.user.emailnotificationpreference
+        pending_matches = _pending_matches_for_user(
+            preference,
+            monitor_cadences=[schedule.cadence],
+        )
+        sent_count += int(_send_preference_digest(preference, pending_matches, schedule=schedule, now=now))
+        schedule.next_send_at = next_send_at(schedule.cadence, now=now)
+        schedule.save(update_fields=["next_send_at", "updated_at"])
     return sent_count
 
 
@@ -226,19 +223,31 @@ def render_user_match_alerts(alerts: Iterable[UserMatchAlert]) -> list[RenderedU
     ]
 
 
-def _eligible_preferences(*, user_ids: set[int], cadences: list[str]) -> list[EmailNotificationPreference]:
+def _eligible_preferences(*, user_ids: set[int]) -> list[EmailNotificationPreference]:
     return list(
         EmailNotificationPreference.objects.filter(
             user_id__in=user_ids,
-            cadence__in=cadences,
             started_at__isnull=False,
         ).select_related("user"),
+    )
+
+
+def _preferences_with_monitor_cadence(*, cadence: str) -> list[EmailNotificationPreference]:
+    return list(
+        EmailNotificationPreference.objects.filter(
+            started_at__isnull=False,
+            user__monitor__is_active=True,
+            user__monitor__notification_cadence=cadence,
+        )
+        .distinct()
+        .select_related("user"),
     )
 
 
 def _pending_matches_for_user(
     preference: EmailNotificationPreference,
     *,
+    monitor_cadences: Iterable[str],
     match_ids: Iterable[int] | None = None,
 ):
     delivered_items = EmailMatchDelivery.objects.filter(
@@ -247,6 +256,8 @@ def _pending_matches_for_user(
     )
     matches = Match.objects.filter(
         monitor__user_id=preference.user_id,
+        monitor__is_active=True,
+        monitor__notification_cadence__in=monitor_cadences,
         created_at__gte=preference.started_at,
     )
     if match_ids is not None:
@@ -262,6 +273,7 @@ def _send_preference_digest(
     preference: EmailNotificationPreference,
     matches,
     *,
+    schedule: EmailNotificationSchedule | None = None,
     now: datetime | None = None,
 ) -> bool:
     alerts = build_user_match_alerts(matches)
@@ -289,6 +301,7 @@ def _send_preference_digest(
             "user_id": preference.user_id,
             "reddit_item_ids": [alert.reddit_item_id for alert in alerts],
             "preference_id": preference.pk,
+            "schedule_id": schedule.pk if schedule else None,
             "sent_at": sent_at.isoformat(),
         },
     )
@@ -307,13 +320,6 @@ def _has_verified_account_email(preference: EmailNotificationPreference) -> bool
 def _digest_subject(alert_count: int) -> str:
     item_label = "match" if alert_count == 1 else "matches"
     return f"ChatterSift: {alert_count} new Reddit {item_label}"
-
-
-def _next_send_at(cadence: str, *, now: datetime) -> datetime | None:
-    interval = CADENCE_INTERVALS.get(cadence)
-    if interval is None:
-        return None
-    return now + interval
 
 
 def _highlight_keywords(text: str, keywords: Iterable[str]) -> SafeString:

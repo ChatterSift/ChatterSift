@@ -8,6 +8,9 @@ import pytest
 from django.conf import settings
 from django.urls import reverse
 
+from chattersift.alerts.models import EmailNotificationPreference
+from chattersift.alerts.models import EmailNotificationSchedule
+from chattersift.alerts.models import NotificationCadence
 from chattersift.tracking.models import Match
 from chattersift.tracking.models import Monitor
 from chattersift.users.tests.factories import UserFactory
@@ -54,7 +57,7 @@ def test_htmx_create_response_creates_monitors_and_returns_dashboard_content(cli
 
     response = client.post(
         reverse("tracking:monitor_create"),
-        {"subreddit": "r/django", "keywords": "postgres\nhtmx"},
+        {"subreddit": "r/django", "keywords": "postgres\nhtmx", "cadence": "off"},
         HTTP_HX_REQUEST="true",
     )
 
@@ -66,6 +69,39 @@ def test_htmx_create_response_creates_monitors_and_returns_dashboard_content(cli
     assert 'id="dashboard-content"' in content
     assert "postgres" in content
     assert "htmx" in content
+
+
+def test_create_monitor_with_periodic_cadence_creates_email_schedule(client, user) -> None:
+    client.force_login(user)
+
+    response = client.post(
+        reverse("tracking:monitor_create"),
+        {"subreddit": "r/django", "keywords": "postgres", "cadence": NotificationCadence.THIRTY_MINUTES},
+        HTTP_HX_REQUEST="true",
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert EmailNotificationPreference.objects.filter(user=user, started_at__isnull=False).exists()
+    assert EmailNotificationSchedule.objects.filter(
+        user=user,
+        cadence=NotificationCadence.THIRTY_MINUTES,
+    ).exists()
+
+
+def test_htmx_create_response_keeps_form_open_for_validation_errors(client, user) -> None:
+    client.force_login(user)
+
+    response = client.post(
+        reverse("tracking:monitor_create"),
+        {"subreddit": "r/django", "keywords": ","},
+        HTTP_HX_REQUEST="true",
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert not Monitor.objects.filter(user=user).exists()
+    content = response.content.decode()
+    assert "Enter at least one keyword." in content
+    assert "showForm: true" in content
 
 
 def test_deactivate_is_owner_scoped(client, user) -> None:
@@ -103,6 +139,16 @@ def test_dashboard_template_contains_htmx_controls(client, user) -> None:
     content = response.content.decode()
     assert 'hx-post="/dash/monitors/"' in content
     assert 'hx-indicator="#global-loading"' in content
+
+
+def test_settings_page_does_not_show_notifications_section(client, user) -> None:
+    client.force_login(user)
+
+    response = client.get(reverse("tracking:dashboard_settings"))
+
+    content = response.content.decode()
+    assert "Notifications" not in content
+    assert "Manage your profile and account." in content
 
 
 def test_dashboard_does_not_show_match_content(client, user) -> None:

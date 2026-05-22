@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from chattersift.alerts.models import NotificationCadence
 from chattersift.tracking.forms import MonitorBatchForm
 
 
@@ -8,6 +9,7 @@ def test_monitor_batch_form_normalizes_subreddit_prefix() -> None:
 
     assert form.is_valid()
     assert form.cleaned_data["subreddit"] == "django"
+    assert form.cleaned_data["cadence"] == NotificationCadence.THIRTY_MINUTES
 
 
 def test_monitor_batch_form_rejects_unsafe_subreddit_tokens() -> None:
@@ -25,7 +27,7 @@ def test_monitor_batch_form_rejects_empty_keywords() -> None:
 
 
 def test_monitor_batch_form_dedupes_keywords_case_insensitively() -> None:
-    form = MonitorBatchForm(data={"subreddit": "django", "keywords": "Postgres\npostgres\nHTMX"})
+    form = MonitorBatchForm(data={"subreddit": "django", "keywords": "Postgres\npostgres\nHTMX", "cadence": "off"})
 
     assert form.is_valid()
     assert form.cleaned_data["keywords"] == ["Postgres", "HTMX"]

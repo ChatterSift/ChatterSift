@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.messages.middleware import MessageMiddleware
 from django.contrib.sessions.middleware import SessionMiddleware
@@ -23,7 +24,7 @@ from chattersift.users.views import user_detail_view
 if TYPE_CHECKING:
     from django.test import RequestFactory
 
-    from chattersift.users.models import User
+User = get_user_model()
 
 pytestmark = pytest.mark.django_db
 

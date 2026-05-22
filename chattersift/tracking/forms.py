@@ -6,6 +6,8 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from chattersift.alerts.models import NotificationCadence
+
 SUBREDDIT_TOKEN_RE = re.compile(r"^[A-Za-z0-9_]+$")
 KEYWORD_SPLIT_RE = re.compile(r"[\n,]+")
 SUBREDDIT_MAX_LENGTH = 100
@@ -17,6 +19,11 @@ class MonitorBatchForm(forms.Form):
 
     subreddit = forms.CharField(max_length=SUBREDDIT_MAX_LENGTH)
     keywords = forms.CharField()
+    cadence = forms.ChoiceField(
+        choices=NotificationCadence,
+        initial=NotificationCadence.THIRTY_MINUTES,
+        required=False,
+    )
 
     def clean_subreddit(self) -> str:
         raw_subreddit = self.cleaned_data["subreddit"].strip()
@@ -54,3 +61,25 @@ class MonitorBatchForm(forms.Form):
             raise ValidationError(_("Enter at least one keyword."))
 
         return list(keywords_by_key.values())
+
+    def clean_cadence(self) -> str:
+        cadence = self.cleaned_data.get("cadence")
+        return cadence or NotificationCadence.THIRTY_MINUTES
+
+
+class KeywordAddForm(forms.Form):
+    """Interface: validates a single keyword to add to an existing subreddit group."""
+
+    keyword = forms.CharField(max_length=KEYWORD_MAX_LENGTH)
+
+    def clean_keyword(self) -> str:
+        keyword = self.cleaned_data["keyword"].strip()
+        if not keyword:
+            raise ValidationError(_("Enter a keyword."))
+        return keyword
+
+
+class CadenceForm(forms.Form):
+    """Interface: validates a notification cadence selection."""
+
+    cadence = forms.ChoiceField(choices=NotificationCadence)

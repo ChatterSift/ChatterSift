@@ -2,15 +2,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from ninja import Router
 
 from chattersift.users.api.schema import UpdateUserSchema
 from chattersift.users.api.schema import UserSchema
-from chattersift.users.models import User
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
+
+User = get_user_model()
 
 router = Router(tags=["users"])
 

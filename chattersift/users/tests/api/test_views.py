@@ -4,6 +4,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from chattersift.users.tests.factories import UserFactory
@@ -11,7 +12,7 @@ from chattersift.users.tests.factories import UserFactory
 if TYPE_CHECKING:
     from django.test import Client
 
-    from chattersift.users.models import User
+User = get_user_model()
 
 pytestmark = pytest.mark.django_db
 

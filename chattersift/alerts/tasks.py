@@ -6,6 +6,7 @@ from django.utils.dateparse import parse_datetime
 
 from .models import EmailMatchDelivery
 from .models import EmailNotificationPreference
+from .models import EmailNotificationSchedule
 from .services import send_due_email_digests
 from .services import send_immediate_email_digests
 
@@ -36,13 +37,14 @@ def send_mail(  # noqa: PLR0913
 
 
 @shared_task()
-def record_match_email_delivery(
+def record_match_email_delivery(  # noqa: PLR0913
     sent_count: int,
     *,
     user_id: int,
     reddit_item_ids: list[str],
     preference_id: int,
     sent_at: str,
+    schedule_id: int | None = None,
 ) -> None:
     """Finalize match-delivery state after the async mail task succeeds."""
 
@@ -65,6 +67,8 @@ def record_match_email_delivery(
         ignore_conflicts=True,
     )
     EmailNotificationPreference.objects.filter(pk=preference_id).update(last_sent_at=parsed_sent_at)
+    if schedule_id is not None:
+        EmailNotificationSchedule.objects.filter(pk=schedule_id).update(last_sent_at=parsed_sent_at)
 
 
 @shared_task()

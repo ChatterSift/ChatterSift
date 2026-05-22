@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from django.contrib.auth import get_user_model
 from factory import Faker
 from factory import post_generation
 from factory.django import DjangoModelFactory
 
-from chattersift.users.models import User
+User = get_user_model()
 
 
 class UserFactory(DjangoModelFactory[User]):

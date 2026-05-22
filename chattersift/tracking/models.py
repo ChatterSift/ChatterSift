@@ -2,12 +2,19 @@ from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from chattersift.alerts.models import NotificationCadence
+
 
 class Monitor(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     subreddit = models.CharField(max_length=100)
     keyword = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
+    notification_cadence = models.CharField(
+        max_length=16,
+        choices=NotificationCadence,
+        default=NotificationCadence.THIRTY_MINUTES,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
