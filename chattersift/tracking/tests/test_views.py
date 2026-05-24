@@ -6,6 +6,7 @@ from http import HTTPStatus
 
 import pytest
 from django.conf import settings
+from django.test import SimpleTestCase
 from django.urls import reverse
 
 from chattersift.alerts.models import EmailNotificationPreference
@@ -234,7 +235,7 @@ def test_matches_page_selected_subreddit_filter_is_applied(client, user) -> None
     content = response.content.decode()
     assert "Python <mark>asyncio</mark> news" in content
     assert "Django <mark>Postgres</mark> deployment" not in content
-    assert '<option value="python" selected>' in content
+    SimpleTestCase().assertInHTML('<option value="python" selected>r/python</option>', content)
 
 
 def test_matches_page_unknown_subreddit_filter_resets_to_all(client, user) -> None:
