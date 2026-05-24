@@ -26,10 +26,11 @@ class MonitorBatchForm(forms.Form):
         initial=MonitorMatchMode.KEYWORD,
         required=False,
     )
-    keywords = forms.CharField(required=False)
+    keywords = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 3}))
     semantic_description = forms.CharField(
         max_length=SEMANTIC_DESCRIPTION_MAX_LENGTH,
         required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
     )
     cadence = forms.ChoiceField(
         choices=NotificationCadence,
