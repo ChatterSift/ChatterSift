@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+"""Generate a single-file production Docker environment."""
+
+from __future__ import annotations
+
+import argparse
+import secrets
+import string
+import sys
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+EXAMPLE_PATH = BASE_DIR / ".env.production.example"
+OUTPUT_PATH = BASE_DIR / ".env.production"
+
+
+def _secret(length: int = 64) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _admin_url() -> str:
+    return f"{_secret(32)}/"
+
+
+def _replace_empty_value(line: str, key: str, value: str) -> str:
+    if line == f"{key}=":
+        return f"{key}={value}"
+    return line
+
+
+def build_env() -> str:
+    """Build the deployment env file from the checked-in example."""
+    lines = EXAMPLE_PATH.read_text().splitlines()
+    replacements = {
+        "DJANGO_SECRET_KEY": _secret(),
+        "DJANGO_ADMIN_URL": _admin_url(),
+        "POSTGRES_PASSWORD": _secret(),
+    }
+    rendered = []
+    for source_line in lines:
+        rendered_line = source_line
+        for key, value in replacements.items():
+            rendered_line = _replace_empty_value(rendered_line, key, value)
+        rendered.append(rendered_line)
+    return "\n".join(rendered) + "\n"
+
+
+def main() -> None:
+    """Write .env.production unless it already exists."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--force", action="store_true", help="overwrite an existing .env.production")
+    args = parser.parse_args()
+
+    if OUTPUT_PATH.exists() and not args.force:
+        message = f"{OUTPUT_PATH} already exists. Use --force to replace it."
+        raise SystemExit(message)
+
+    OUTPUT_PATH.write_text(build_env())
+    sys.stdout.write(f"Wrote {OUTPUT_PATH}\n")
+    sys.stdout.write(
+        "Edit CHATTERSIFT_SITE_DOMAIN, CADDY_SITE_ADDRESS, CADDY_ACME_EMAIL, and email settings before deploy.\n",
+    )
+
+
+if __name__ == "__main__":
+    main()

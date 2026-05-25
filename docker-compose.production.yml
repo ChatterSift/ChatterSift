@@ -17,12 +17,25 @@ services:
 
     image: chattersift_production_django
     depends_on:
-      - postgres
-      - redis
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
-      - ./.envs/.production/.django
-      - ./.envs/.production/.postgres
+      - ./.env.production
     command: /start
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/healthz/', timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   postgres:
     build:
@@ -33,7 +46,25 @@ services:
       - production_postgres_data:/var/lib/postgresql/data
       - production_postgres_data_backups:/backups
     env_file:
-      - ./.envs/.production/.postgres
+      - ./.env.production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    <<: *django
+    image: chattersift_production_migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: bash -c "python /app/manage.py migrate --noinput && python /app/manage.py sync_site_domain"
+    restart: "no"
+    healthcheck:
+      disable: true
 
   caddy:
     build:
@@ -41,7 +72,10 @@ services:
       dockerfile: ./compose/production/caddy/Dockerfile
     image: chattersift_production_caddy
     depends_on:
-      - django
+      django:
+        condition: service_healthy
+    env_file:
+      - ./.env.production
     volumes:
       - production_caddy_data:/data
       - production_caddy_config:/config
@@ -55,23 +89,32 @@ services:
 
     volumes:
       - production_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 
   celeryworker:
     <<: *django
     image: chattersift_production_celeryworker
     command: /start-celeryworker
+    healthcheck:
+      disable: true
 
   celerybeat:
     <<: *django
     image: chattersift_production_celerybeat
     command: /start-celerybeat
+    healthcheck:
+      disable: true
 
   awscli:
     build:
       context: .
       dockerfile: ./compose/production/aws/Dockerfile
     env_file:
-      - ./.envs/.production/.django
+      - ./.env.production
     volumes:
       - production_postgres_data_backups:/backups:z

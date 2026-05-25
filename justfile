@@ -1,7 +1,7 @@
 export COMPOSE_FILE := "docker-compose.local.yml"
 export DJANGO_READ_DOT_ENV_FILE := "True"
 load-local-postgres := "set -a; . ./.envs/.local/.postgres; set +a;"
-load-production-env := "set -a; . ./.envs/.production/.django; . ./.envs/.production/.postgres; set +a;"
+load-production-env := "set -a; . ./.env.production; set +a;"
 
 ## Just does not yet manage signals for subprocesses reliably, which can lead to unexpected behavior.
 ## Exercise caution before expanding its usage in production environments.
@@ -23,6 +23,22 @@ build mode="local" *args:
         echo "Unknown mode '{{mode}}'. Use 'local' or 'production'."; \
         exit 2; \
     fi
+
+# deploy-init: Generate .env.production with internal secrets.
+deploy-init *args:
+    @scripts/bootstrap-deploy-env {{args}}
+
+# deploy: Build, migrate, and start the production Docker stack.
+deploy *args:
+    @docker compose --env-file .env.production -f docker-compose.production.yml up -d --build --remove-orphans {{args}}
+
+# deploy-logs: View production Docker logs.
+deploy-logs *args:
+    @docker compose --env-file .env.production -f docker-compose.production.yml logs -f {{args}}
+
+# deploy-manage: Execute manage.py in production Docker.
+deploy-manage +args:
+    @docker compose --env-file .env.production -f docker-compose.production.yml run --rm django python ./manage.py {{args}}
 
 # up: Start Docker containers. Use `local` or `production`.
 up mode="local":

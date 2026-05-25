@@ -111,8 +111,32 @@ You must set the DSN url in production.
 
 ## Deployment
 
-The following details how to deploy this application.
+### Quick Deploy
 
-### Docker
+Chattersift is designed to run on a single VPS with Docker Compose and Caddy.
 
-See detailed [cookiecutter-django Docker documentation](https://cookiecutter-django.readthedocs.io/en/latest/3-deployment/deployment-with-docker.html).
+```bash
+uv sync
+just deploy-init
+```
+
+Edit `.env.production` and set at least:
+
+- `CHATTERSIFT_SITE_DOMAIN`
+- `CADDY_SITE_ADDRESS`
+- `CADDY_ACME_EMAIL`
+- `DJANGO_ALLOWED_HOSTS`
+- `DJANGO_CSRF_TRUSTED_ORIGINS`
+- `DJANGO_DEFAULT_FROM_EMAIL`
+- `CHATTERSIFT_EMAIL_PROVIDER` plus that provider's credentials
+
+Then start the production stack:
+
+```bash
+just deploy
+just deploy-logs
+```
+
+The production stack includes Postgres, Redis, Django, Celery, and Caddy. It runs migrations automatically before the web and worker services start.
+
+See [docs/deployment.md](docs/deployment.md) for the full deployment, upgrade, email, LLM, and backup reference.

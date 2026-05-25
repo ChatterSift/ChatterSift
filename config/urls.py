@@ -7,7 +7,10 @@ from django.urls import path
 from django.views import defaults as default_views
 from django.views.generic import TemplateView
 
+from chattersift.core.views import healthz
+
 urlpatterns = [
+    path("healthz/", healthz, name="healthz"),
     path(
         "",
         TemplateView.as_view(template_name=settings.CHATTERSIFT_HOME_TEMPLATE),

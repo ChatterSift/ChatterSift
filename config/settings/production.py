@@ -9,6 +9,7 @@ from sentry_sdk.integrations.redis import RedisIntegration
 from .base import *  # noqa: F403
 from .base import DATABASES
 from .base import INSTALLED_APPS
+from .base import MIDDLEWARE
 from .base import REDIS_URL
 from .base import env
 
@@ -16,8 +17,19 @@ from .base import env
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#secret-key
 SECRET_KEY = env("DJANGO_SECRET_KEY")
+CHATTERSIFT_SITE_DOMAIN = env("CHATTERSIFT_SITE_DOMAIN")
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["chattersift.com"])
+ALLOWED_HOSTS = env.list(
+    "DJANGO_ALLOWED_HOSTS",
+    default=[CHATTERSIFT_SITE_DOMAIN, f"www.{CHATTERSIFT_SITE_DOMAIN}"],
+)
+CSRF_TRUSTED_ORIGINS = env.list(
+    "DJANGO_CSRF_TRUSTED_ORIGINS",
+    default=[
+        f"https://{CHATTERSIFT_SITE_DOMAIN}",
+        f"https://www.{CHATTERSIFT_SITE_DOMAIN}",
+    ],
+)
 
 # DATABASES
 # ------------------------------------------------------------------------------
@@ -69,6 +81,15 @@ SECURE_CONTENT_TYPE_NOSNIFF = env.bool(
     default=True,
 )
 
+MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 USE_S3 = env.bool("DJANGO_USE_S3", default=False)
 if USE_S3:
@@ -114,7 +135,7 @@ if USE_S3:
 # https://docs.djangoproject.com/en/dev/ref/settings/#default-from-email
 DEFAULT_FROM_EMAIL = env(
     "DJANGO_DEFAULT_FROM_EMAIL",
-    default="chattersift <noreply@chattersift.com>",
+    default=f"Chattersift <noreply@{CHATTERSIFT_SITE_DOMAIN}>",
 )
 # https://docs.djangoproject.com/en/dev/ref/settings/#server-email
 SERVER_EMAIL = env("DJANGO_SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
@@ -130,17 +151,47 @@ ACCOUNT_EMAIL_SUBJECT_PREFIX = EMAIL_SUBJECT_PREFIX
 # Django Admin URL regex.
 ADMIN_URL = env("DJANGO_ADMIN_URL")
 
-USE_ANYMAIL = env.bool("DJANGO_USE_ANYMAIL", default=False)
-if USE_ANYMAIL:
+EMAIL_PROVIDER = env("CHATTERSIFT_EMAIL_PROVIDER", default="smtp")
+ANYMAIL_EMAIL_BACKENDS = {
+    "amazon_ses": "anymail.backends.amazon_ses.EmailBackend",
+    "mailgun": "anymail.backends.mailgun.EmailBackend",
+    "postmark": "anymail.backends.postmark.EmailBackend",
+    "brevo": "anymail.backends.brevo.EmailBackend",
+    "resend": "anymail.backends.resend.EmailBackend",
+    "mailjet": "anymail.backends.mailjet.EmailBackend",
+    "mailersend": "anymail.backends.mailersend.EmailBackend",
+}
+if EMAIL_PROVIDER == "smtp":
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = env("EMAIL_HOST", default="")
+    EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+    EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+    EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+    EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+    EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
+elif EMAIL_PROVIDER in ANYMAIL_EMAIL_BACKENDS:
     # https://anymail.readthedocs.io/en/stable/installation/#installing-anymail
     INSTALLED_APPS += ["anymail"]
-    EMAIL_BACKEND = "anymail.backends.amazon_ses.EmailBackend"
-    ANYMAIL = {}
+    EMAIL_BACKEND = ANYMAIL_EMAIL_BACKENDS[EMAIL_PROVIDER]
+    ANYMAIL = {
+        "AMAZON_SES_CLIENT_PARAMS": env.json("ANYMAIL_AMAZON_SES_CLIENT_PARAMS", default={}),
+        "MAILGUN_API_KEY": env("ANYMAIL_MAILGUN_API_KEY", default=""),
+        "MAILGUN_SENDER_DOMAIN": env("ANYMAIL_MAILGUN_SENDER_DOMAIN", default=""),
+        "POSTMARK_SERVER_TOKEN": env("ANYMAIL_POSTMARK_SERVER_TOKEN", default=""),
+        "BREVO_API_KEY": env("ANYMAIL_BREVO_API_KEY", default=""),
+        "RESEND_API_KEY": env("ANYMAIL_RESEND_API_KEY", default=""),
+        "MAILJET_API_KEY": env("ANYMAIL_MAILJET_API_KEY", default=""),
+        "MAILJET_SECRET_KEY": env("ANYMAIL_MAILJET_SECRET_KEY", default=""),
+        "MAILERSEND_API_TOKEN": env("ANYMAIL_MAILERSEND_API_TOKEN", default=""),
+    }
+else:
+    message = f"CHATTERSIFT_EMAIL_PROVIDER must be one of: smtp, {', '.join(sorted(ANYMAIL_EMAIL_BACKENDS))}."
+    raise ValueError(message)
 
 # django-compressor
 # ------------------------------------------------------------------------------
 # https://django-compressor.readthedocs.io/en/latest/settings/#django.conf.settings.COMPRESS_ENABLED
-COMPRESS_ENABLED = env.bool("COMPRESS_ENABLED", default=True)
+COMPRESS_ENABLED = env.bool("COMPRESS_ENABLED", default=False)
 # https://django-compressor.readthedocs.io/en/latest/settings/#django.conf.settings.COMPRESS_STORAGE
 COMPRESS_STORAGE = STORAGES["staticfiles"]["BACKEND"] if USE_S3 else "compressor.storage.CompressorFileStorage"
 # https://django-compressor.readthedocs.io/en/latest/settings/#django.conf.settings.COMPRESS_URL

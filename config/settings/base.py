@@ -99,13 +99,14 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 CHATTERSIFT_URLCONFS = []
 CHATTERSIFT_HOME_TEMPLATE: str = "pages/home.html"
 CHATTERSIFT_ENABLE_API = env.bool("CHATTERSIFT_ENABLE_API", default=False)
+CHATTERSIFT_SITE_DOMAIN = env("CHATTERSIFT_SITE_DOMAIN", default="localhost")
 CHATTERSIFT_API_ROUTERS = [
     ("/users/", "chattersift.users.api.views.router"),
 ]
 CHATTERSIFT_REDDIT_FEED_FORMAT = env("CHATTERSIFT_REDDIT_FEED_FORMAT", default="rss")
 CHATTERSIFT_REDDIT_USER_AGENT = env(
     "CHATTERSIFT_REDDIT_USER_AGENT",
-    default="chattersift-bot/0.1 (+https://chattersift.com)",
+    default=f"chattersift-bot/0.1 (+https://{CHATTERSIFT_SITE_DOMAIN})",
 )
 CHATTERSIFT_REDDIT_FETCH_LIMIT = env.int("CHATTERSIFT_REDDIT_FETCH_LIMIT", default=100)
 CHATTERSIFT_REDDIT_HTTP_TIMEOUT_SECONDS = env.float(
@@ -294,7 +295,7 @@ EMAIL_BACKEND = env(
 )
 DEFAULT_FROM_EMAIL = env(
     "DJANGO_DEFAULT_FROM_EMAIL",
-    default="noreply@chattersift.com",
+    default=f"noreply@{CHATTERSIFT_SITE_DOMAIN}",
 )
 # https://docs.djangoproject.com/en/dev/ref/settings/#email-timeout
 EMAIL_TIMEOUT = 5
@@ -304,7 +305,7 @@ EMAIL_TIMEOUT = 5
 # Django Admin URL.
 ADMIN_URL = "admin/"
 # https://docs.djangoproject.com/en/dev/ref/settings/#admins
-ADMINS = ["contact@chattersift.com"]
+ADMINS = [env("DJANGO_ADMIN_EMAIL", default=f"admin@{CHATTERSIFT_SITE_DOMAIN}")]
 # https://docs.djangoproject.com/en/dev/ref/settings/#managers
 MANAGERS = ADMINS
 # https://cookiecutter-django.readthedocs.io/en/latest/settings.html#other-environment-settings

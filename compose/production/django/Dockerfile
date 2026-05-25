@@ -1,4 +1,16 @@
 
+FROM node:22-bookworm-slim AS node-build-stage
+
+ARG APP_HOME=/app
+
+WORKDIR ${APP_HOME}
+
+COPY ./package.json ./package-lock.json ${APP_HOME}/
+RUN npm ci
+COPY ./chattersift ${APP_HOME}/chattersift
+RUN npm run build:css
+
+
 # define an alias for the specific python version used in this file.
 FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS python-build-stage
 
@@ -22,6 +34,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project --no-dev
 COPY . ${APP_HOME}
+COPY --from=node-build-stage ${APP_HOME}/chattersift/static/css/project.css \
+  ${APP_HOME}/chattersift/static/css/project.css
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \

@@ -11,7 +11,7 @@
 		trusted_proxies_strict
 	}
 
-	email contact@chattersift.com
+	email {$CADDY_ACME_EMAIL}
 }
 
 (access_log) {
@@ -27,7 +27,7 @@
 	}
 }
 
-chattersift.com, www.chattersift.com {
+{$CADDY_SITE_ADDRESS} {
 	import access_log
 
 	reverse_proxy django:5000 {

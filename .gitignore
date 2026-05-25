@@ -275,6 +275,7 @@ chattersift/static/css/project.css
 .pytest_cache/
 .ipython/
 .env
+.env.production
 .envrc.local
 .envs/*
 /mailpit
