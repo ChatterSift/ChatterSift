@@ -120,6 +120,14 @@ CHATTERSIFT_REDDIT_SCHEDULER_INTERVAL_SECONDS = env.int(
     "CHATTERSIFT_REDDIT_SCHEDULER_INTERVAL_SECONDS",
     default=60,
 )
+CHATTERSIFT_REDDIT_ITEM_RETENTION_DAYS = env.int(
+    "CHATTERSIFT_REDDIT_ITEM_RETENTION_DAYS",
+    default=14,
+)
+CHATTERSIFT_REDDIT_ITEM_PRUNE_INTERVAL_SECONDS = env.int(
+    "CHATTERSIFT_REDDIT_ITEM_PRUNE_INTERVAL_SECONDS",
+    default=86400,
+)
 CHATTERSIFT_ALERT_DISPATCH_INTERVAL_SECONDS = env.int(
     "CHATTERSIFT_ALERT_DISPATCH_INTERVAL_SECONDS",
     default=60,
@@ -367,6 +375,10 @@ CELERY_BEAT_SCHEDULE = {
     "fetch-due-reddit-feeds": {
         "task": "chattersift.reddit.tasks.fetch_due_reddit_feeds",
         "schedule": CHATTERSIFT_REDDIT_SCHEDULER_INTERVAL_SECONDS,
+    },
+    "prune-unmatched-reddit-items": {
+        "task": "chattersift.reddit.tasks.prune_unmatched_reddit_items",
+        "schedule": CHATTERSIFT_REDDIT_ITEM_PRUNE_INTERVAL_SECONDS,
     },
     "send-due-match-notifications": {
         "task": "chattersift.alerts.tasks.send_due_match_notifications",

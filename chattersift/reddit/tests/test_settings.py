@@ -15,3 +15,10 @@ def test_send_due_match_notifications_is_scheduled() -> None:
 
     assert schedule_entry["task"] == "chattersift.alerts.tasks.send_due_match_notifications"
     assert schedule_entry["schedule"] == settings.CHATTERSIFT_ALERT_DISPATCH_INTERVAL_SECONDS
+
+
+def test_prune_unmatched_reddit_items_is_scheduled() -> None:
+    schedule_entry = settings.CELERY_BEAT_SCHEDULE["prune-unmatched-reddit-items"]
+
+    assert schedule_entry["task"] == "chattersift.reddit.tasks.prune_unmatched_reddit_items"
+    assert schedule_entry["schedule"] == settings.CHATTERSIFT_REDDIT_ITEM_PRUNE_INTERVAL_SECONDS

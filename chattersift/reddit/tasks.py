@@ -7,6 +7,7 @@ from celery import shared_task
 from .clients import build_default_reddit_client
 from .ingestion import fetch_due_feeds
 from .services import fetch_normalize_and_match
+from .services import prune_unmatched_reddit_items as prune_unmatched_reddit_items_service
 
 
 @shared_task()
@@ -19,3 +20,9 @@ def fetch_due_reddit_feeds(limit: int | None = None) -> dict:
 def fetch_subreddit(subreddit: str) -> int:
     """Compatibility task for the legacy subreddit fetch entrypoint."""
     return fetch_normalize_and_match(subreddit, client=build_default_reddit_client())
+
+
+@shared_task()
+def prune_unmatched_reddit_items(retention_days: int | None = None) -> int:
+    """Delete old unmatched RedditItem cache rows."""
+    return prune_unmatched_reddit_items_service(retention_days=retention_days)
