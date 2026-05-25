@@ -1,33 +1,35 @@
 {% load i18n %}
 
-<div class="space-y-8">
-  <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-    <div>
-      <h1 class="font-display text-2xl font-bold tracking-tight">{% translate "Matches" %}</h1>
-      <p class="text-sm text-base-content/70">{% translate "Recent Reddit content matching your monitors." %}</p>
-    </div>
-    {% if has_monitors %}
+<div class="space-y-6">
+  {# Page header #}
+  <header>
+    <h1 class="font-display text-2xl font-bold tracking-tight">{% translate "Matches" %}</h1>
+    <p class="text-sm text-base-content/70">{% translate "Recent Reddit content matching your monitors." %}</p>
+  </header>
+  {# Toolbar #}
+  {% if has_monitors %}
+    <section class="flex items-center justify-between gap-3 border-b border-base-300 pb-3">
       <form method="get"
             action="{% url 'tracking:matches' %}"
             hx-get="{% url 'tracking:matches' %}"
             hx-target="#dash-content"
             hx-push-url="true"
-            hx-indicator="#global-loading">
-        <label class="form-control">
-          <span class="label-text mb-1 text-sm">{% translate "Subreddit" %}</span>
-          <select class="select select-bordered min-w-56"
-                  name="subreddit"
-                  onchange="this.form.requestSubmit()">
-            <option value="">{% translate "All subreddits" %}</option>
-            {% for subreddit in feed.subreddit_options %}
-              <option value="{{ subreddit }}"
-                      {% if feed.selected_subreddit == subreddit %}selected{% endif %}>r/{{ subreddit }}</option>
-            {% endfor %}
-          </select>
-        </label>
+            hx-indicator="#global-loading"
+            class="flex items-center gap-2">
+        <label for="matches-subreddit-filter" class="text-sm text-base-content/70">{% translate "Subreddit" %}</label>
+        <select id="matches-subreddit-filter"
+                class="select select-sm select-bordered min-w-56"
+                name="subreddit"
+                onchange="this.form.requestSubmit()">
+          <option value="">{% translate "All subreddits" %}</option>
+          {% for subreddit in feed.subreddit_options %}
+            <option value="{{ subreddit }}"
+                    {% if feed.selected_subreddit == subreddit %}selected{% endif %}>r/{{ subreddit }}</option>
+          {% endfor %}
+        </select>
       </form>
-    {% endif %}
-  </div>
+    </section>
+  {% endif %}
   <div class="space-y-4">
     {% if has_matches %}
       {% for item in feed.items %}

@@ -3,12 +3,13 @@
 <div id="dashboard-content"
      class="space-y-6"
      x-data="{ showForm: {{ show_monitor_form|yesno:'true,false' }} }">
-  {# Header with add button #}
-  <section class="flex items-center justify-between">
-    <div>
-      <h1 class="font-display text-2xl font-bold tracking-tight">{% translate "Monitors" %}</h1>
-      <p class="text-sm text-base-content/60">{% translate "Track Reddit keywords by subreddit." %}</p>
-    </div>
+  {# Page header #}
+  <header>
+    <h1 class="font-display text-2xl font-bold tracking-tight">{% translate "Monitors" %}</h1>
+    <p class="text-sm text-base-content/60">{% translate "Track Reddit keywords by subreddit." %}</p>
+  </header>
+  {# Toolbar #}
+  <section class="flex items-center justify-end border-b border-base-300 pb-3">
     <button class="btn btn-sm gap-1.5"
             @click="showForm = !showForm"
             :class="showForm ? 'btn-ghost' : 'btn-primary'">

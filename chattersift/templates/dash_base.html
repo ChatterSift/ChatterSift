@@ -3,8 +3,8 @@
 {% load static i18n %}
 
 {% block body %}
-  {# Masks the 12px gap above the floating pill so scrolling content doesn't bleed through. #}
-  <div class="fixed inset-x-0 top-0 h-3 z-40 bg-base-100/80 backdrop-blur-lg pointer-events-none"></div>
+  {# Blurs everything behind the top nav (12px gap + 56px pill) so scrolling content doesn't bleed through. #}
+  <div class="fixed inset-x-0 top-0 h-20 z-40 bg-base-100/80 backdrop-blur-lg pointer-events-none"></div>
   {# Floating pill nav #}
   <header class="sticky top-3 z-50 mx-auto w-full max-w-5xl px-4 lg:px-6">
     <div class="relative flex h-14 items-center justify-between rounded-full bg-base-100/80 backdrop-blur-lg text-base-content ring-1 ring-base-300 shadow-sm pl-4 pr-2.5"
