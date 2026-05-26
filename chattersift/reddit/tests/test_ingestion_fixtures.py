@@ -117,7 +117,7 @@ def test_fetch_feed_normalize_and_match_ingests_raw_fixture(
 
     reddit_ids = {payload.reddit_id for payload in payloads}
     assert result.fetched_count == len(payloads)
-    assert result.upserted_count == len(payloads)
+    assert result.cached_count == len(payloads)
     assert result.skipped_count == 0
     assert result.last_seen_fullname == payloads[0].reddit_id
     assert RedditItem.objects.filter(reddit_id__in=reddit_ids).count() == len(
@@ -166,8 +166,8 @@ def test_fetch_feed_normalize_and_match_is_idempotent_with_raw_fixture() -> None
     first_result = fetch_feed_normalize_and_match(spec, client=client)
     second_result = fetch_feed_normalize_and_match(spec, client=client)
 
-    assert first_result.upserted_count == len(payloads)
-    assert second_result.upserted_count == 0
+    assert first_result.cached_count == len(payloads)
+    assert second_result.cached_count == 0
     assert first_result.matched_count >= 1
     assert second_result.matched_count == 0
     assert RedditItem.objects.count() == len(
@@ -279,7 +279,7 @@ def ingest_fixture_and_snapshot_items(
     )
 
     assert result.fetched_count == len(payloads)
-    assert result.upserted_count == len(payloads)
+    assert result.cached_count == len(payloads)
     return {
         item.reddit_id: (
             item.item_type,
@@ -309,7 +309,7 @@ def ingest_fixture_and_snapshot_full_items(
     )
 
     assert result.fetched_count == len(payloads)
-    assert result.upserted_count == len(payloads)
+    assert result.cached_count == len(payloads)
     return {
         item.reddit_id: (
             item.item_type,

@@ -217,7 +217,7 @@ class FetchResult:
     Fields:
         spec: Feed spec that was attempted.
         fetched_count: Number of payloads returned by the client.
-        upserted_count: Number of RedditItem rows inserted or updated.
+        cached_count: Number of RedditItem cache rows inserted or updated.
         matched_count: Number of monitor matches created.
         skipped_count: Number of payloads skipped during normalization/upsert.
         status_code: HTTP status code when available.
@@ -227,7 +227,7 @@ class FetchResult:
 
     spec: RedditFeedSpec
     fetched_count: int
-    upserted_count: int
+    cached_count: int
     matched_count: int
     skipped_count: int
     status_code: int | None
@@ -245,7 +245,7 @@ class IngestionResult:
         succeeded_count: Number of successful feed attempts.
         failed_count: Number of failed feed attempts.
         fetched_count: Total fetched payloads.
-        upserted_count: Total RedditItem rows inserted or updated.
+        cached_count: Total RedditItem cache rows inserted or updated.
         matched_count: Total monitor matches created.
     """
 
@@ -253,5 +253,5 @@ class IngestionResult:
     succeeded_count: int
     failed_count: int
     fetched_count: int
-    upserted_count: int
+    cached_count: int
     matched_count: int

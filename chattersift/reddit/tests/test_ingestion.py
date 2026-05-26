@@ -92,7 +92,7 @@ def test_fetch_feed_normalize_and_match_upserts_and_creates_matches() -> None:
     result = fetch_feed_normalize_and_match(spec, client=FakeRedditClient([payload]))
 
     assert result.fetched_count == 1
-    assert result.upserted_count == 1
+    assert result.cached_count == 1
     assert result.matched_count == 1
     assert result.skipped_count == 0
     assert result.last_seen_fullname == "t3_postgres"
@@ -160,8 +160,8 @@ def test_fetch_feed_normalize_and_match_is_idempotent_for_existing_matches() -> 
     second_result = fetch_feed_normalize_and_match(spec, client=client)
 
     assert first_result.matched_count == 1
-    assert first_result.upserted_count == 1
-    assert second_result.upserted_count == 0
+    assert first_result.cached_count == 1
+    assert second_result.cached_count == 0
     assert second_result.matched_count == 0
     assert Match.objects.count() == 1
 
@@ -196,7 +196,7 @@ def test_fetch_feed_normalize_and_match_counts_changed_existing_items() -> None:
     result = fetch_feed_normalize_and_match(spec, client=FakeRedditClient([payload]))
 
     assert result.fetched_count == 1
-    assert result.upserted_count == 1
+    assert result.cached_count == 1
     assert RedditItem.objects.get(reddit_id="t3_changed").title == "Updated title"
 
 
@@ -220,7 +220,7 @@ def test_fetch_feed_normalize_and_match_does_not_match_comment_context_title() -
 
     result = fetch_feed_normalize_and_match(spec, client=FakeRedditClient([payload]))
 
-    assert result.upserted_count == 1
+    assert result.cached_count == 1
     assert result.matched_count == 0
     assert RedditItem.objects.filter(reddit_id="t1_context_only").exists()
     assert not Match.objects.filter(reddit_item_id="t1_context_only").exists()

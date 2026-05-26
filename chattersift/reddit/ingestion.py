@@ -92,7 +92,7 @@ def fetch_due_feeds(
     succeeded_count = 0
     failed_count = 0
     fetched_count = 0
-    upserted_count = 0
+    cached_count = 0
     matched_count = 0
 
     for spec in get_due_feed_specs(limit=limit):
@@ -120,7 +120,7 @@ def fetch_due_feeds(
 
         succeeded_count += 1
         fetched_count += result.fetched_count
-        upserted_count += result.upserted_count
+        cached_count += result.cached_count
         matched_count += result.matched_count
 
     return IngestionResult(
@@ -128,7 +128,7 @@ def fetch_due_feeds(
         succeeded_count=succeeded_count,
         failed_count=failed_count,
         fetched_count=fetched_count,
-        upserted_count=upserted_count,
+        cached_count=cached_count,
         matched_count=matched_count,
     )
 
@@ -143,7 +143,7 @@ def _upsert_and_match_payloads(
 ) -> FetchResult:
     """Upsert fetched payloads, evaluate monitor matches, and enqueue notifications."""
     valid_payloads = []
-    upserted_count = 0
+    cached_count = 0
     skipped_count = 0
     last_seen_fullname = ""
 
@@ -158,7 +158,7 @@ def _upsert_and_match_payloads(
             continue
 
         valid_payloads.append(payload)
-        upserted_count += int(did_upsert)
+        cached_count += int(did_upsert)
 
     intents = build_monitor_intents_for_active_monitors()
     requests = build_match_requests(intents, valid_payloads)
@@ -176,7 +176,7 @@ def _upsert_and_match_payloads(
     return FetchResult(
         spec=spec,
         fetched_count=len(payloads),
-        upserted_count=upserted_count,
+        cached_count=cached_count,
         matched_count=len(created_match_ids),
         skipped_count=skipped_count,
         status_code=None,

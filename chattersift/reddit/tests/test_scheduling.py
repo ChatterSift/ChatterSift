@@ -37,7 +37,7 @@ def test_mark_feed_success_delays_next_fetch(settings) -> None:
         FetchResult(
             spec=spec,
             fetched_count=1,
-            upserted_count=1,
+            cached_count=1,
             matched_count=0,
             skipped_count=0,
             status_code=None,
