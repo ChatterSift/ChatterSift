@@ -75,6 +75,24 @@ class Match(models.Model):
                 name="unique_match_per_monitor_reddit_item",
             ),
         ]
+        indexes = [
+            models.Index(fields=["created_at"], name="tracking_match_created_idx"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.monitor_id}:{self.reddit_item_id}"
+
+
+class MatchRetentionPreference(models.Model):
+    """Stores one user's matched-item retention window."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    retention_days = models.PositiveIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["user_id"]
+
+    def __str__(self) -> str:
+        return str(self.user_id)

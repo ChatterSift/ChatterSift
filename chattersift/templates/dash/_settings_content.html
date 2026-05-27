@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n widget_tweaks %}
 
 <div class="space-y-6">
   <div>
@@ -16,6 +16,45 @@
         <a class="btn btn-ghost btn-sm border border-base-300"
            href="{% url 'mfa_index' %}">{% translate "Two-factor authentication" %}</a>
       </div>
+    </div>
+  </section>
+  {# Matched items #}
+  <section class="card border border-base-300 bg-base-100">
+    <div class="card-body">
+      <h2 class="card-title text-base">{% translate "Matched items" %}</h2>
+      <p class="text-sm text-base-content/70 mb-3">
+        {% translate "Choose how long matched Reddit items stay in your account." %}
+      </p>
+      <form method="post"
+            action="{% url 'tracking:match_retention_update' %}"
+            hx-post="{% url 'tracking:match_retention_update' %}"
+            hx-target="#dash-content"
+            hx-swap="innerHTML"
+            hx-indicator="#match-retention-saving"
+            class="max-w-sm space-y-3">
+        {% csrf_token %}
+        <div class="form-control">
+          <label class="label"
+                 for="{{ match_retention_form.retention_days.id_for_label }}">
+            <span class="label-text">{% translate "Retention" %}</span>
+          </label>
+          {% render_field match_retention_form.retention_days class+="select select-bordered w-full" %}
+          {% if match_retention_form.retention_days.errors %}
+            <div class="mt-2 text-sm text-error">{{ match_retention_form.retention_days.errors|join:", " }}</div>
+          {% endif %}
+          {% if match_retention_form.non_field_errors %}
+            <div class="mt-2 text-sm text-error">{{ match_retention_form.non_field_errors|join:", " }}</div>
+          {% endif %}
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="submit" class="btn btn-primary btn-sm">{% translate "Save" %}</button>
+          <span id="match-retention-saving"
+                class="htmx-indicator inline-flex items-center gap-2 text-sm text-base-content/60">
+            <span class="loading loading-spinner loading-xs"></span>
+            {% translate "Saving" %}
+          </span>
+        </div>
+      </form>
     </div>
   </section>
 </div>

@@ -15,6 +15,15 @@ KEYWORD_SPLIT_RE = re.compile(r"[\n,]+")
 SUBREDDIT_MAX_LENGTH = 100
 KEYWORD_MAX_LENGTH = 255
 SEMANTIC_DESCRIPTION_MAX_LENGTH = 2000
+MATCH_RETENTION_DEFAULT_DAYS = 30
+MATCH_RETENTION_FOREVER_VALUE = "forever"
+MATCH_RETENTION_CHOICES = [
+    ("7", _("7 days")),
+    ("30", _("30 days")),
+    ("90", _("90 days")),
+    ("365", _("365 days")),
+    (MATCH_RETENTION_FOREVER_VALUE, _("Keep forever")),
+]
 
 
 class MonitorBatchForm(forms.Form):
@@ -125,3 +134,18 @@ class CadenceForm(forms.Form):
     """Validates a notification cadence selection."""
 
     cadence = forms.ChoiceField(choices=NotificationCadence)
+
+
+class MatchRetentionForm(forms.Form):
+    """Validates a matched-item retention preset selection."""
+
+    retention_days = forms.ChoiceField(
+        choices=MATCH_RETENTION_CHOICES,
+        initial=str(MATCH_RETENTION_DEFAULT_DAYS),
+    )
+
+    def clean_retention_days(self) -> int | None:
+        value = self.cleaned_data["retention_days"]
+        if value == MATCH_RETENTION_FOREVER_VALUE:
+            return None
+        return int(value)

@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import Match
+from .models import MatchRetentionPreference
 from .models import Monitor
 
 
@@ -36,3 +37,14 @@ class MatchAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at"]
     date_hierarchy = "occurred_at"
     ordering = ["-occurred_at"]
+
+
+@admin.register(MatchRetentionPreference)
+class MatchRetentionPreferenceAdmin(admin.ModelAdmin):
+    """Admin interface for matched-item retention preferences."""
+
+    list_display = ["user", "retention_days", "created_at", "updated_at"]
+    search_fields = ["user__email", "user__name"]
+    autocomplete_fields = ["user"]
+    readonly_fields = ["created_at", "updated_at"]
+    ordering = ["user_id"]

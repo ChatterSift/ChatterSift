@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime
+from datetime import timedelta
 from hashlib import sha256
 from typing import TYPE_CHECKING
 from typing import cast
@@ -10,6 +12,7 @@ from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Max
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.html import format_html_join
 
@@ -18,6 +21,7 @@ from chattersift.alerts.schedules import ensure_email_delivery_state
 from chattersift.reddit.contracts import MonitorMatchMode
 
 from .models import Match
+from .models import MatchRetentionPreference
 from .models import Monitor
 
 if TYPE_CHECKING:
@@ -28,6 +32,7 @@ if TYPE_CHECKING:
     from chattersift.reddit.models import RedditItem
 
 User = get_user_model()
+DEFAULT_MATCH_RETENTION_DAYS = 30
 
 
 @dataclass(frozen=True)
@@ -259,6 +264,52 @@ def update_group_cadence(*, user: User, subreddit: str, cadence: str) -> None:
         notification_cadence=cadence,
     )
     ensure_email_delivery_state(user=user, cadence=cadence)
+
+
+def get_match_retention_days(user: User) -> int | None:
+    """Return the user's matched-item retention days, defaulting missing rows to 30 days."""
+
+    preference = MatchRetentionPreference.objects.filter(user=user).first()
+    if preference is None:
+        return DEFAULT_MATCH_RETENTION_DAYS
+    return preference.retention_days
+
+
+@transaction.atomic
+def update_match_retention_days(*, user: User, retention_days: int | None) -> MatchRetentionPreference:
+    """Persist one user's matched-item retention preference."""
+
+    preference, _ = MatchRetentionPreference.objects.select_for_update().update_or_create(
+        user=user,
+        defaults={"retention_days": retention_days},
+    )
+    return preference
+
+
+def prune_expired_matches_for_user(*, user: User, now: datetime | None = None) -> int:
+    """Delete expired Match rows for one user based on Match.created_at."""
+
+    retention_days = get_match_retention_days(user)
+    if retention_days is None:
+        return 0
+
+    reference_time = now or timezone.now()
+    cutoff = reference_time - timedelta(days=retention_days)
+    deleted_count, _ = Match.objects.filter(
+        monitor__user=user,
+        created_at__lt=cutoff,
+    ).delete()
+    return deleted_count
+
+
+def prune_expired_matches(*, now: datetime | None = None) -> int:
+    """Delete expired Match rows for every user with default or explicit retention."""
+
+    reference_time = now or timezone.now()
+    total_deleted = 0
+    for user in User.objects.all().iterator():
+        total_deleted += prune_expired_matches_for_user(user=user, now=reference_time)
+    return total_deleted
 
 
 def build_dashboard_groups(

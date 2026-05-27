@@ -2,13 +2,22 @@ from __future__ import annotations
 
 from datetime import UTC
 from datetime import datetime
+from datetime import timedelta
 
 import pytest
+from django.utils import timezone
 
+from chattersift.alerts.models import EmailMatchDelivery
+from chattersift.reddit.models import RedditItem
 from chattersift.tracking.models import Match
+from chattersift.tracking.models import MatchRetentionPreference
 from chattersift.tracking.models import Monitor
 from chattersift.tracking.services import build_dashboard_groups
 from chattersift.tracking.services import build_matches_feed
+from chattersift.tracking.services import get_match_retention_days
+from chattersift.tracking.services import prune_expired_matches
+from chattersift.tracking.services import prune_expired_matches_for_user
+from chattersift.tracking.services import update_match_retention_days
 from chattersift.tracking.services import upsert_keyword_monitors
 from chattersift.users.tests.factories import UserFactory
 
@@ -17,6 +26,7 @@ pytestmark = pytest.mark.django_db
 EXPECTED_CREATED_MONITOR_COUNT = 2
 DEFAULT_MATCHES_PAGE_SIZE = 25
 SECOND_PAGE_NUMBER = 2
+DEFAULT_MATCH_RETENTION_DAYS = 30
 
 
 def test_upsert_keyword_monitors_creates_one_monitor_per_keyword(user) -> None:
@@ -183,6 +193,90 @@ def test_build_matches_feed_highlighting_escapes_html(user) -> None:
 
     assert "&lt;script&gt;<mark>postgres</mark>&lt;/script&gt;" in str(feed.items[0].title_html)
     assert "&lt;b&gt;<mark>postgres</mark>&lt;/b&gt;" in str(feed.items[0].body_html)
+
+
+def test_get_match_retention_days_defaults_missing_preference_to_thirty_days(user) -> None:
+    assert get_match_retention_days(user) == DEFAULT_MATCH_RETENTION_DAYS
+
+
+def test_update_match_retention_days_persists_keep_forever(user) -> None:
+    preference = update_match_retention_days(user=user, retention_days=None)
+
+    assert preference.retention_days is None
+    assert MatchRetentionPreference.objects.get(user=user).retention_days is None
+
+
+def test_prune_expired_matches_for_user_deletes_by_match_created_at(user) -> None:
+    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    now = timezone.now()
+    old_match = _create_match(monitor, reddit_item_id="t3_old", occurred_at=now)
+    fresh_match = _create_match(monitor, reddit_item_id="t3_fresh", occurred_at=now - timedelta(days=365))
+    Match.objects.filter(pk=old_match.pk).update(created_at=now - timedelta(days=31))
+    Match.objects.filter(pk=fresh_match.pk).update(created_at=now - timedelta(days=29))
+
+    deleted_count = prune_expired_matches_for_user(user=user, now=now)
+
+    assert deleted_count == 1
+    assert list(Match.objects.values_list("reddit_item_id", flat=True)) == ["t3_fresh"]
+
+
+def test_prune_expired_matches_skips_keep_forever(user) -> None:
+    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    match = _create_match(monitor, reddit_item_id="t3_forever")
+    Match.objects.filter(pk=match.pk).update(created_at=timezone.now() - timedelta(days=400))
+    MatchRetentionPreference.objects.create(user=user, retention_days=None)
+
+    assert prune_expired_matches_for_user(user=user) == 0
+    assert Match.objects.filter(pk=match.pk).exists()
+
+
+def test_prune_expired_matches_isolates_users(user) -> None:
+    other_user = UserFactory()
+    user_monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    other_monitor = Monitor.objects.create(user=other_user, subreddit="django", keyword="postgres")
+    now = timezone.now()
+    user_match = _create_match(user_monitor, reddit_item_id="t3_user")
+    other_match = _create_match(other_monitor, reddit_item_id="t3_other")
+    Match.objects.filter(pk__in=[user_match.pk, other_match.pk]).update(created_at=now - timedelta(days=31))
+
+    deleted_count = prune_expired_matches_for_user(user=user, now=now)
+
+    assert deleted_count == 1
+    assert Match.objects.filter(pk=other_match.pk).exists()
+
+
+def test_prune_expired_matches_preserves_related_monitor_reddit_cache_and_email_rows(user) -> None:
+    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    match = _create_match(monitor, reddit_item_id="t3_old")
+    now = timezone.now()
+    Match.objects.filter(pk=match.pk).update(created_at=now - timedelta(days=31))
+    reddit_item = RedditItem.objects.create(
+        reddit_id="t3_old",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        title="Django thread",
+        body="postgres",
+        permalink="https://www.reddit.com/r/django/comments/t3_old/example/",
+        occurred_at=now,
+    )
+    delivery = EmailMatchDelivery.objects.create(user=user, reddit_item_id="t3_old", sent_at=now)
+
+    deleted_count = prune_expired_matches_for_user(user=user, now=now)
+
+    assert deleted_count == 1
+    assert Monitor.objects.filter(pk=monitor.pk).exists()
+    assert RedditItem.objects.filter(pk=reddit_item.pk).exists()
+    assert EmailMatchDelivery.objects.filter(pk=delivery.pk).exists()
+
+
+def test_prune_expired_matches_applies_default_to_users_without_preference(user) -> None:
+    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    match = _create_match(monitor, reddit_item_id="t3_default")
+    now = timezone.now()
+    Match.objects.filter(pk=match.pk).update(created_at=now - timedelta(days=31))
+
+    assert prune_expired_matches(now=now) == 1
+    assert not Match.objects.filter(pk=match.pk).exists()
 
 
 def _create_match(

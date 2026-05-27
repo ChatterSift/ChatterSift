@@ -2,17 +2,20 @@ from __future__ import annotations
 
 from datetime import UTC
 from datetime import datetime
+from datetime import timedelta
 from http import HTTPStatus
 
 import pytest
 from django.conf import settings
 from django.test import SimpleTestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from chattersift.alerts.models import EmailNotificationPreference
 from chattersift.alerts.models import EmailNotificationSchedule
 from chattersift.alerts.models import NotificationCadence
 from chattersift.tracking.models import Match
+from chattersift.tracking.models import MatchRetentionPreference
 from chattersift.tracking.models import Monitor
 from chattersift.users.tests.factories import UserFactory
 
@@ -21,6 +24,7 @@ pytestmark = pytest.mark.django_db
 EXPECTED_CREATED_MONITOR_COUNT = 2
 EXPECTED_MATCH_BADGE_COUNT = 2
 DEFAULT_MATCHES_PAGE_SIZE = 25
+RETENTION_NINETY_DAYS = 90
 
 
 def test_dashboard_requires_login(client) -> None:
@@ -153,6 +157,75 @@ def test_settings_page_does_not_show_notifications_section(client, user) -> None
     assert "Profile" not in content
     assert "Display name" not in content
     assert "Manage your account." in content
+
+
+def test_settings_page_requires_login(client) -> None:
+    response = client.get(reverse("tracking:dashboard_settings"))
+
+    assert response.status_code == HTTPStatus.FOUND
+    assert response.url == f"{reverse(settings.LOGIN_URL)}?next=/dash/settings/"
+
+
+def test_settings_page_renders_match_retention_control(client, user) -> None:
+    client.force_login(user)
+
+    response = client.get(reverse("tracking:dashboard_settings"))
+
+    content = response.content.decode()
+    assert "Matched items" in content
+    assert 'name="retention_days"' in content
+    SimpleTestCase().assertInHTML('<option value="30" selected>30 days</option>', content)
+
+
+def test_match_retention_htmx_save_updates_preference_and_renders_inline_indicator(client, user) -> None:
+    client.force_login(user)
+
+    response = client.post(
+        reverse("tracking:match_retention_update"),
+        {"retention_days": "90"},
+        HTTP_HX_REQUEST="true",
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert MatchRetentionPreference.objects.get(user=user).retention_days == RETENTION_NINETY_DAYS
+    content = response.content.decode()
+    assert 'hx-indicator="#match-retention-saving"' in content
+    assert 'hx-indicator="#global-loading"' not in content
+    SimpleTestCase().assertInHTML('<option value="90" selected>90 days</option>', content)
+
+
+def test_match_retention_save_shows_validation_errors(client, user) -> None:
+    client.force_login(user)
+
+    response = client.post(
+        reverse("tracking:match_retention_update"),
+        {"retention_days": "14"},
+        HTTP_HX_REQUEST="true",
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert not MatchRetentionPreference.objects.filter(user=user).exists()
+    assert "Select a valid choice" in response.content.decode()
+
+
+def test_match_retention_save_prunes_current_user_matches_immediately(client, user) -> None:
+    other_user = UserFactory()
+    user_monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    other_monitor = Monitor.objects.create(user=other_user, subreddit="django", keyword="postgres")
+    user_match = _create_match(user_monitor, reddit_item_id="t3_user_old")
+    other_match = _create_match(other_monitor, reddit_item_id="t3_other_old")
+    Match.objects.filter(pk__in=[user_match.pk, other_match.pk]).update(created_at=timezone.now() - timedelta(days=31))
+    client.force_login(user)
+
+    response = client.post(
+        reverse("tracking:match_retention_update"),
+        {"retention_days": "7"},
+        HTTP_HX_REQUEST="true",
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert not Match.objects.filter(pk=user_match.pk).exists()
+    assert Match.objects.filter(pk=other_match.pk).exists()
 
 
 def test_dashboard_does_not_show_match_content(client, user) -> None:

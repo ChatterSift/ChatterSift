@@ -14,8 +14,10 @@ from django.views.decorators.http import require_POST
 from chattersift.alerts.models import NotificationCadence
 from chattersift.reddit.contracts import MonitorMatchMode
 
+from .forms import MATCH_RETENTION_FOREVER_VALUE
 from .forms import CadenceForm
 from .forms import KeywordAddForm
+from .forms import MatchRetentionForm
 from .forms import MonitorBatchForm
 from .models import Monitor
 from .services import add_keyword_to_subreddit
@@ -23,8 +25,11 @@ from .services import build_dashboard_groups
 from .services import build_matches_feed
 from .services import delete_single_monitor
 from .services import delete_subreddit_group
+from .services import get_match_retention_days
+from .services import prune_expired_matches_for_user
 from .services import toggle_subreddit_group
 from .services import update_group_cadence
+from .services import update_match_retention_days
 from .services import upsert_monitors
 
 if TYPE_CHECKING:
@@ -172,12 +177,24 @@ def matches(request: HttpRequest) -> HttpResponse:
 def dashboard_settings(request: HttpRequest) -> HttpResponse:
     """Renders the consolidated dashboard settings page."""
 
-    context = {
-        "dash_active_nav": "settings",
-    }
+    context = _settings_context(request)
     if request.headers.get("HX-Request"):
         return render(request, "dash/_settings_content.html", context)
     return render(request, "dash/settings.html", context)
+
+
+@login_required
+@require_POST
+def match_retention_update(request: HttpRequest) -> HttpResponse:
+    """Updates matched-item retention and prunes newly expired current-user matches."""
+
+    form = MatchRetentionForm(request.POST)
+    if form.is_valid():
+        update_match_retention_days(user=request.user, retention_days=form.cleaned_data["retention_days"])
+        prune_expired_matches_for_user(user=request.user)
+        form = _match_retention_form(request)
+
+    return render(request, "dash/_settings_content.html", _settings_context(request, match_retention_form=form))
 
 
 def _dashboard_context(request: HttpRequest, *, form: MonitorBatchForm | None = None) -> dict[str, object]:
@@ -191,6 +208,27 @@ def _dashboard_context(request: HttpRequest, *, form: MonitorBatchForm | None = 
         "cadence_choices": NotificationCadence.choices,
         "match_mode_choices": MonitorMatchMode.choices,
     }
+
+
+def _settings_context(
+    request: HttpRequest,
+    *,
+    match_retention_form: MatchRetentionForm | None = None,
+) -> dict[str, object]:
+    """Build the settings template context for full-page and partial renders."""
+
+    return {
+        "dash_active_nav": "settings",
+        "match_retention_form": match_retention_form or _match_retention_form(request),
+    }
+
+
+def _match_retention_form(request: HttpRequest) -> MatchRetentionForm:
+    """Return the current user's matched-item retention form."""
+
+    retention_days = get_match_retention_days(request.user)
+    initial = MATCH_RETENTION_FOREVER_VALUE if retention_days is None else str(retention_days)
+    return MatchRetentionForm(initial={"retention_days": initial})
 
 
 def _render_dashboard_content(

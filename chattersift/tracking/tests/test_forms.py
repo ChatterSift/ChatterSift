@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from chattersift.alerts.models import NotificationCadence
+from chattersift.tracking.forms import MATCH_RETENTION_DEFAULT_DAYS
+from chattersift.tracking.forms import MatchRetentionForm
 from chattersift.tracking.forms import MonitorBatchForm
 
 
@@ -68,3 +70,32 @@ def test_monitor_batch_form_rejects_semantic_when_model_missing(settings) -> Non
 
     assert not form.is_valid()
     assert "semantic_description" in form.errors
+
+
+def test_match_retention_form_accepts_preset_values() -> None:
+    expected_values = {
+        "7": 7,
+        "30": 30,
+        "90": 90,
+        "365": 365,
+        "forever": None,
+    }
+
+    for raw_value, expected_value in expected_values.items():
+        form = MatchRetentionForm(data={"retention_days": raw_value})
+
+        assert form.is_valid()
+        assert form.cleaned_data["retention_days"] == expected_value
+
+
+def test_match_retention_form_defaults_to_thirty_days() -> None:
+    form = MatchRetentionForm()
+
+    assert form["retention_days"].value() == str(MATCH_RETENTION_DEFAULT_DAYS)
+
+
+def test_match_retention_form_rejects_tampered_value() -> None:
+    form = MatchRetentionForm(data={"retention_days": "14"})
+
+    assert not form.is_valid()
+    assert "retention_days" in form.errors
