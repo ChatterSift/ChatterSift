@@ -72,8 +72,8 @@ deploy-init: ## Generate .env.production with internal secrets.
 	scripts/bootstrap-deploy-env $(CMD_ARGS)
 
 .PHONY: deploy
-deploy: ## Build, migrate, and start the production Docker stack.
-	$(PRODUCTION_COMPOSE) up -d --build --remove-orphans $(CMD_ARGS)
+deploy: ## Alias for `make up production`.
+	$(MAKE) up production $(CMD_ARGS)
 
 .PHONY: deploy-logs
 deploy-logs: ## Follow production Docker logs.
@@ -86,13 +86,13 @@ deploy-manage: ## Run manage.py in production Docker.
 .PHONY: up
 up: ## Start Docker containers. Use `make up [local|production]`.
 	@$(call require_known_mode)
-	npm install
-	npm run build:css
 	@if [[ "$(MODE)" == "production" ]]; then \
 		echo "Starting production Docker containers..."; \
 		$(PRODUCTION_COMPOSE) up -d --build --remove-orphans $(CMD_ARGS); \
 	else \
 		echo "Starting local Docker containers..."; \
+		npm install; \
+		npm run build:css; \
 		$(call local_compose_with_postgres_env,up -d --remove-orphans $(CMD_ARGS)); \
 		$(call local_compose_with_postgres_env,run --rm django python ./manage.py collectstatic --noinput); \
 	fi
