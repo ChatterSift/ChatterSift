@@ -26,6 +26,7 @@ from .scheduling import mark_feed_failure
 from .scheduling import mark_feed_success
 
 if TYPE_CHECKING:
+    from .contracts import MatchRequest
     from .contracts import RedditFeedSpec
     from .matching import RedditMatcher
 
@@ -143,6 +144,7 @@ def _upsert_and_match_payloads(
 ) -> FetchResult:
     """Upsert fetched payloads, evaluate monitor matches, and enqueue notifications."""
     valid_payloads = []
+    matchable_payloads = []
     cached_count = 0
     skipped_count = 0
     last_seen_fullname = ""
@@ -159,9 +161,11 @@ def _upsert_and_match_payloads(
 
         valid_payloads.append(payload)
         cached_count += int(did_upsert)
+        if did_upsert:
+            matchable_payloads.append(payload)
 
     intents = build_monitor_intents_for_active_monitors()
-    requests = build_match_requests(intents, valid_payloads)
+    requests = _filter_requests_without_existing_matches(build_match_requests(intents, matchable_payloads))
     semantic_problems: list[SemanticEvaluationProblem] = []
     decisions = evaluate_match_requests(
         requests,
@@ -211,6 +215,31 @@ def _upsert_item(payload) -> tuple[RedditItem, bool]:
         setattr(item, field_name, defaults[field_name])
     item.save(update_fields=changed_fields)
     return item, True
+
+
+def _filter_requests_without_existing_matches(requests: list[MatchRequest]) -> list[MatchRequest]:
+    """Return requests that do not already have a persisted Match row."""
+    if not requests:
+        return []
+
+    requested_pairs = {
+        (request.intent.monitor_id, request.item.reddit_id)
+        for request in requests
+        if request.intent.monitor_id is not None
+    }
+    existing_pairs = set(
+        Match.objects.filter(
+            monitor_id__in={monitor_id for monitor_id, _ in requested_pairs},
+            reddit_item_id__in={reddit_id for _, reddit_id in requested_pairs},
+        ).values_list("monitor_id", "reddit_item_id"),
+    )
+
+    return [request for request in requests if _match_request_pair(request) not in existing_pairs]
+
+
+def _match_request_pair(request: MatchRequest) -> tuple[int | None, str]:
+    """Return the persisted Match identity represented by a match request."""
+    return request.intent.monitor_id, request.item.reddit_id
 
 
 def _persist_match_decisions(decisions, payloads: list) -> list[int]:

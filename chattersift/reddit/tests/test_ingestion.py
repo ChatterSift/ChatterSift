@@ -50,7 +50,11 @@ class FailingRedditClient(RedditClient):
 class MatchingSemanticMatcher(RedditMatcher):
     """Semantic test matcher that always approves the request."""
 
+    def __init__(self) -> None:
+        self.call_count = 0
+
     def evaluate(self, request: MatchRequest) -> MatchDecision:
+        self.call_count += 1
         return MatchDecision(
             monitor_id=request.intent.monitor_id or 0,
             reddit_id=request.item.reddit_id,
@@ -264,6 +268,156 @@ def test_keyword_semantic_persists_semantic_match_metadata() -> None:
     assert match.match_mode == MonitorMatchMode.KEYWORD_SEMANTIC
     assert match.confidence == SEMANTIC_TEST_CONFIDENCE
     assert match.match_reason == "semantic:test_match"
+
+
+def test_keyword_semantic_does_not_re_evaluate_unchanged_cached_items() -> None:
+    user = UserFactory()
+    Monitor.objects.create(
+        user=user,
+        subreddit="django",
+        match_mode=MonitorMatchMode.KEYWORD_SEMANTIC,
+        keyword="postgres",
+        semantic_description="database outage reports",
+        semantic_fingerprint="semantic",
+    )
+    payload = RedditItemPayload(
+        reddit_id="t3_semantic_cached",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/semantic-cached/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Postgres outage",
+        body="A Django deployment hit database problems.",
+    )
+    spec = RedditFeedSpec(
+        kind=RedditFeedKind.POST_SEARCH,
+        format=RedditFeedFormat.JSON,
+        subreddit="django",
+        query='"postgres"',
+        query_fingerprint="semantic-cached",
+    )
+    matcher = MatchingSemanticMatcher()
+    client = FakeRedditClient([payload])
+
+    first_result = fetch_feed_normalize_and_match(spec, client=client, semantic_matcher=matcher)
+
+    with patch("chattersift.reddit.ingestion.send_mail.delay") as send_mail_delay:
+        second_result = fetch_feed_normalize_and_match(spec, client=client, semantic_matcher=matcher)
+
+    assert first_result.matched_count == 1
+    assert first_result.cached_count == 1
+    assert second_result.matched_count == 0
+    assert second_result.cached_count == 0
+    assert matcher.call_count == 1
+    assert Match.objects.count() == 1
+    send_mail_delay.assert_not_called()
+
+
+def test_keyword_semantic_re_evaluates_changed_cached_items() -> None:
+    user = UserFactory()
+    Monitor.objects.create(
+        user=user,
+        subreddit="django",
+        match_mode=MonitorMatchMode.KEYWORD_SEMANTIC,
+        keyword="postgres",
+        semantic_description="database outage reports",
+        semantic_fingerprint="semantic",
+    )
+    RedditItem.objects.create(
+        reddit_id="t3_semantic_changed",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/semantic-changed/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Original Postgres title",
+        body="Original body",
+    )
+    payload = RedditItemPayload(
+        reddit_id="t3_semantic_changed",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/semantic-changed/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Updated Postgres outage",
+        body="A Django deployment hit database problems.",
+    )
+    spec = RedditFeedSpec(
+        kind=RedditFeedKind.POST_SEARCH,
+        format=RedditFeedFormat.JSON,
+        subreddit="django",
+        query='"postgres"',
+        query_fingerprint="semantic-changed",
+    )
+    matcher = MatchingSemanticMatcher()
+
+    result = fetch_feed_normalize_and_match(
+        spec,
+        client=FakeRedditClient([payload]),
+        semantic_matcher=matcher,
+    )
+
+    assert result.cached_count == 1
+    assert result.matched_count == 1
+    assert matcher.call_count == 1
+
+
+def test_existing_match_skips_semantic_evaluation_for_monitor_item_pair() -> None:
+    user = UserFactory()
+    monitor = Monitor.objects.create(
+        user=user,
+        subreddit="django",
+        match_mode=MonitorMatchMode.KEYWORD_SEMANTIC,
+        keyword="postgres",
+        semantic_description="database outage reports",
+        semantic_fingerprint="semantic",
+    )
+    RedditItem.objects.create(
+        reddit_id="t3_existing_semantic",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/existing-semantic/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Original Postgres title",
+        body="Original body",
+    )
+    Match.objects.create(
+        monitor=monitor,
+        reddit_item_id="t3_existing_semantic",
+        title="Original Postgres title",
+        permalink="https://www.reddit.com/r/django/comments/existing-semantic/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        match_mode=MonitorMatchMode.KEYWORD_SEMANTIC,
+        confidence=SEMANTIC_TEST_CONFIDENCE,
+        match_reason="semantic:existing",
+    )
+    payload = RedditItemPayload(
+        reddit_id="t3_existing_semantic",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/existing-semantic/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Updated Postgres outage",
+        body="A Django deployment hit database problems.",
+    )
+    spec = RedditFeedSpec(
+        kind=RedditFeedKind.POST_SEARCH,
+        format=RedditFeedFormat.JSON,
+        subreddit="django",
+        query='"postgres"',
+        query_fingerprint="existing-semantic",
+    )
+    matcher = MatchingSemanticMatcher()
+
+    result = fetch_feed_normalize_and_match(
+        spec,
+        client=FakeRedditClient([payload]),
+        semantic_matcher=matcher,
+    )
+
+    assert result.cached_count == 1
+    assert result.matched_count == 0
+    assert matcher.call_count == 0
+    assert Match.objects.count() == 1
 
 
 def test_semantic_errors_do_not_fail_feed_and_enqueue_one_admin_email() -> None:
