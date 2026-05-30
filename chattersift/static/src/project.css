@@ -423,11 +423,6 @@ a:hover .brand-sift::after,
   margin: 0;
 }
 
-.cs-match-feed {
-  border-top: 1px solid var(--color-base-300);
-  border-bottom: 1px solid var(--color-base-300);
-}
-
 .cs-match {
   position: relative;
   padding: 1rem 1rem 1.125rem 1.125rem;
