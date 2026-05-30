@@ -2,11 +2,10 @@
 
 {# One semantic or hybrid monitor row with edit-in-place. #}
 {# Expected context: monitor, mode, inline_error. #}
-<div x-data="{ editing: false, expanded: false, kw: '{{ monitor.keyword|escapejs }}', desc: '{{ monitor.semantic_description|escapejs }}', err: '
-  {% if inline_error.kind == 'edit' and inline_error.monitor_pk == monitor.pk %}
-    {{ inline_error.message|escapejs }}
-  {% endif %}
-  ' }" {% if inline_error.kind == 'edit' and inline_error.monitor_pk == monitor.pk %}x-init="editing = true"{% endif %} class="group rounded-md border-l-4 {% if mode == 'semantic' %}border-secondary bg-secondary/5{% else %}border-accent bg-accent/5{% endif %} {% if not monitor.is_active %}opacity-50{% endif %}">
+<div data-initial-err="{% if inline_error.kind == 'edit' and inline_error.monitor_pk == monitor.pk %}{{ inline_error.message }}{% endif %}"
+     x-data="{ editing: false, expanded: false, kw: '{{ monitor.keyword|escapejs }}', desc: '{{ monitor.semantic_description|escapejs }}', err: '' }"
+     x-init="err = $el.dataset.initialErr; if (err) editing = true"
+     class="group rounded-md border-l-4 {% if mode == 'semantic' %}border-secondary bg-secondary/5{% else %}border-accent bg-accent/5{% endif %} {% if not monitor.is_active %}opacity-50{% endif %}">
   {# Display state #}
   <div x-show="!editing" class="flex items-start gap-2 px-2.5 py-1.5">
     <div class="flex-1 min-w-0 text-sm leading-snug">

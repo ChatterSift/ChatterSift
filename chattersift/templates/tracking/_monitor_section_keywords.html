@@ -9,11 +9,9 @@
   </header>
   <div class="flex flex-wrap items-center gap-2">
     {% for monitor in monitors %}
-      <div x-data="{ editing: false, value: '{{ monitor.keyword|escapejs }}', err: '
-        {% if inline_error.kind == 'edit' and inline_error.monitor_pk == monitor.pk %}
-          {{ inline_error.message|escapejs }}
-        {% endif %}
-        ' }" {% if inline_error.kind == 'edit' and inline_error.monitor_pk == monitor.pk %}x-init="editing = true"{% endif %}>
+      <div data-initial-err="{% if inline_error.kind == 'edit' and inline_error.monitor_pk == monitor.pk %}{{ inline_error.message }}{% endif %}"
+           x-data="{ editing: false, value: '{{ monitor.keyword|escapejs }}', err: '' }"
+           x-init="err = $el.dataset.initialErr; if (err) editing = true">
         {# Display chip #}
         <div x-show="!editing"
              class="inline-flex items-stretch h-7 rounded-md overflow-hidden border border-base-300 {% if not monitor.is_active %}opacity-50{% endif %}">
