@@ -26,10 +26,10 @@ class User(AbstractUser):
     objects: ClassVar[UserManager] = UserManager()
 
     def get_absolute_url(self) -> str:
-        """Get URL for user's detail view.
+        """Get the authenticated landing page for this user.
 
         Returns:
-            str: URL for user detail.
+            str: URL for the dashboard.
 
         """
-        return reverse("users:detail", kwargs={"pk": self.id})
+        return reverse("tracking:dashboard")

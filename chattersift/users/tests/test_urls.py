@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from django.contrib.auth import get_user_model
+import pytest
+from django.urls import Resolver404
 from django.urls import resolve
 from django.urls import reverse
-
-User = get_user_model()
-
-
-def test_detail(user: User):
-    assert reverse("users:detail", kwargs={"pk": user.pk}) == f"/users/{user.pk}/"
-    assert resolve(f"/users/{user.pk}/").view_name == "users:detail"
+from django.urls.exceptions import NoReverseMatch
 
 
-def test_redirect():
-    assert reverse("users:redirect") == "/users/~redirect/"
-    assert resolve("/users/~redirect/").view_name == "users:redirect"
+def test_cookiecutter_user_routes_are_not_registered(user):
+    with pytest.raises(NoReverseMatch):
+        reverse("users:detail", kwargs={"pk": user.pk})
+    with pytest.raises(NoReverseMatch):
+        reverse("users:redirect")
+    with pytest.raises(Resolver404):
+        resolve(f"/users/{user.pk}/")
+    with pytest.raises(Resolver404):
+        resolve("/users/~redirect/")

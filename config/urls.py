@@ -18,8 +18,6 @@ urlpatterns = [
     ),
     # Django Admin, use {% url 'admin:index' %}
     path(settings.ADMIN_URL, admin.site.urls),
-    # User management
-    path("users/", include("chattersift.users.urls", namespace="users")),
     path("accounts/", include("allauth.urls")),
     path("", include("chattersift.tracking.urls", namespace="tracking")),
     path("", include("chattersift.alerts.urls", namespace="alerts")),
