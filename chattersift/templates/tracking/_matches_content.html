@@ -2,13 +2,14 @@
 
 <div class="space-y-6">
   {# Page header #}
-  <header>
-    <h1 class="font-display text-2xl font-bold tracking-tight">{% translate "Matches" %}</h1>
-    <p class="text-sm text-base-content/70">{% translate "Recent Reddit content matching your monitors." %}</p>
+  <header class="cs-matches-header">
+    <p class="cs-matches-eyebrow">{% translate "Inbox" %}</p>
+    <h1 class="cs-matches-title">{% translate "Matches" %}</h1>
+    <p class="cs-matches-lede">{% translate "Recent Reddit content matching your monitors." %}</p>
   </header>
   {# Toolbar #}
   {% if has_monitors %}
-    <section class="flex items-center justify-between gap-3 border-b border-base-300 pb-3">
+    <section class="cs-matches-toolbar">
       <form method="get"
             action="{% url 'tracking:matches' %}"
             hx-get="{% url 'tracking:matches' %}"
@@ -16,7 +17,7 @@
             hx-push-url="true"
             hx-indicator="#global-loading"
             class="flex items-center gap-2">
-        <label for="matches-subreddit-filter" class="text-sm text-base-content/70">{% translate "Subreddit" %}</label>
+        <label for="matches-subreddit-filter" class="cs-matches-toolbar__label">{% translate "Subreddit" %}</label>
         <select id="matches-subreddit-filter"
                 class="select select-sm select-bordered min-w-56"
                 name="subreddit"
@@ -28,47 +29,50 @@
           {% endfor %}
         </select>
       </form>
+      {% if has_matches %}
+        <p class="cs-matches-toolbar__count">
+          {% blocktranslate count count=feed.items|length %}{{ count }} match{% plural %}{{ count }} matches{% endblocktranslate %}
+        </p>
+      {% endif %}
     </section>
   {% endif %}
-  <div class="space-y-4">
-    {% if has_matches %}
+  {% if has_matches %}
+    <div class="cs-match-feed">
       {% for item in feed.items %}
         {% include "tracking/_matches_feed_item.html" with item=item %}
       {% endfor %}
-      <nav class="flex items-center justify-between border border-base-300 bg-base-100 p-4 rounded-box">
-        <div class="text-sm text-base-content/70">
-          {% blocktranslate with page=feed.page total_pages=feed.total_pages %}Page {{ page }} of {{ total_pages }}{% endblocktranslate %}
-        </div>
-        <div class="flex gap-2">
-          <a class="btn btn-sm"
-             {% if feed.has_previous %} href="{% url 'tracking:matches' %}{{ previous_page_url }}" hx-get="{% url 'tracking:matches' %}{{ previous_page_url }}" hx-target="#dash-content" hx-push-url="true" hx-indicator="#global-loading" {% else %} aria-disabled="true" {% endif %}>
-            {% translate "Previous" %}
-          </a>
-          <a class="btn btn-sm"
-             {% if feed.has_next %} href="{% url 'tracking:matches' %}{{ next_page_url }}" hx-get="{% url 'tracking:matches' %}{{ next_page_url }}" hx-target="#dash-content" hx-push-url="true" hx-indicator="#global-loading" {% else %} aria-disabled="true" {% endif %}>
-            {% translate "Next" %}
-          </a>
-        </div>
-      </nav>
-    {% elif has_monitors %}
-      <div class="border border-base-300 bg-base-100 p-6 rounded-box">
-        {% if feed.selected_subreddit %}
-          <p class="font-semibold">{% translate "No matches for this subreddit" %}</p>
-          <p class="text-sm text-base-content/70">
-            {% translate "Try another subreddit filter or wait for new monitor matches." %}
-          </p>
-        {% else %}
-          <p class="font-semibold">{% translate "No matches yet" %}</p>
-          <p class="text-sm text-base-content/70">
-            {% translate "Matches will appear here once your monitors find Reddit content." %}
-          </p>
-        {% endif %}
+    </div>
+    <nav class="cs-matches-pager">
+      <div class="cs-matches-pager__status">
+        {% blocktranslate with page=feed.page total_pages=feed.total_pages %}Page {{ page }} of {{ total_pages }}{% endblocktranslate %}
       </div>
-    {% else %}
-      <div class="border border-base-300 bg-base-100 p-6 rounded-box">
-        <p class="font-semibold">{% translate "No monitors yet" %}</p>
-        <p class="text-sm text-base-content/70">{% translate "Create a subreddit monitor to start collecting matches." %}</p>
+      <div class="flex gap-2">
+        <a class="btn btn-sm btn-ghost"
+           {% if feed.has_previous %} href="{% url 'tracking:matches' %}{{ previous_page_url }}" hx-get="{% url 'tracking:matches' %}{{ previous_page_url }}" hx-target="#dash-content" hx-push-url="true" hx-indicator="#global-loading" {% else %} aria-disabled="true" {% endif %}>
+          {% translate "Previous" %}
+        </a>
+        <a class="btn btn-sm btn-ghost"
+           {% if feed.has_next %} href="{% url 'tracking:matches' %}{{ next_page_url }}" hx-get="{% url 'tracking:matches' %}{{ next_page_url }}" hx-target="#dash-content" hx-push-url="true" hx-indicator="#global-loading" {% else %} aria-disabled="true" {% endif %}>
+          {% translate "Next" %}
+        </a>
       </div>
-    {% endif %}
-  </div>
+    </nav>
+  {% elif has_monitors %}
+    <div class="cs-matches-empty">
+      {% if feed.selected_subreddit %}
+        <p class="cs-matches-empty__title">{% translate "No matches for this subreddit" %}</p>
+        <p class="cs-matches-empty__body">{% translate "Try another subreddit filter or wait for new monitor matches." %}</p>
+      {% else %}
+        <p class="cs-matches-empty__title">{% translate "No matches yet" %}</p>
+        <p class="cs-matches-empty__body">
+          {% translate "Matches will appear here once your monitors find Reddit content." %}
+        </p>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="cs-matches-empty">
+      <p class="cs-matches-empty__title">{% translate "No monitors yet" %}</p>
+      <p class="cs-matches-empty__body">{% translate "Create a subreddit monitor to start collecting matches." %}</p>
+    </div>
+  {% endif %}
 </div>

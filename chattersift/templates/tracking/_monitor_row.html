@@ -65,7 +65,7 @@
         hx-target="#dashboard-content"
         hx-swap="outerHTML"
         hx-indicator="#global-loading"
-        class="flex flex-col gap-2 px-2.5 py-2"
+        class="flex flex-col gap-3 px-2.5 py-2.5"
         @keydown.escape="editing = false; err = ''">
     {% csrf_token %}
     <input type="hidden" name="match_mode" value="{{ mode }}" />

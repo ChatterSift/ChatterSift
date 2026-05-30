@@ -1,22 +1,31 @@
 {% load i18n %}
 
-<article class="border border-base-300 bg-base-100 p-4 rounded-box">
-  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-    <div class="min-w-0 space-y-2">
-      <div class="flex flex-wrap gap-2">
-        <span class="badge badge-primary badge-outline">r/{{ item.subreddit }}</span>
-        <span class="badge badge-info badge-outline">{{ item.item_type_label }}</span>
-        {% for label in item.monitor_labels %}<span class="badge badge-accent badge-outline">{{ label }}</span>{% endfor %}
-      </div>
-      <a class="link link-primary font-semibold break-words"
-         href="{{ item.permalink }}"
-         target="_blank"
-         rel="noopener noreferrer">{{ item.title_html }}</a>
-      {% if item.body_html %}<p class="text-sm text-base-content/70 break-words">{{ item.body_html }}</p>{% endif %}
-      <time class="block text-xs text-base-content/60"
-            datetime="{{ item.occurred_at|date:'c' }}">
-        {{ item.occurred_at|date:"M j, Y H:i" }}
-      </time>
-    </div>
+{# Interface: editorial feed row for one matched Reddit item. #}
+<article class="cs-match group">
+  <div class="cs-match__meta">
+    <span class="cs-match__sub">r/{{ item.subreddit }}</span>
+    <span class="cs-match__type" data-type="{{ item.item_type_label|lower }}">{{ item.item_type_label }}</span>
+    <time class="cs-match__time" datetime="{{ item.occurred_at|date:'c' }}">
+      {{ item.occurred_at|date:"M j" }}<span class="cs-match__time-sep">·</span>{{ item.occurred_at|date:"H:i" }}
+    </time>
   </div>
+  <h2 class="cs-match__title">
+    <a class="cs-match__link"
+       href="{{ item.permalink }}"
+       target="_blank"
+       rel="noopener noreferrer">
+      {% if item.title_html %}
+        {{ item.title_html }}
+      {% else %}
+        {{ item.body_html }}
+      {% endif %}
+    </a>
+  </h2>
+  {% if item.title_html and item.body_html %}<p class="cs-match__excerpt">{{ item.body_html }}</p>{% endif %}
+  {% if item.monitor_labels %}
+    <div class="cs-match__tags">
+      <span class="cs-match__tags-label">{% translate "matched on" %}</span>
+      {% for label in item.monitor_labels %}<span class="cs-match__tag">{{ label }}</span>{% endfor %}
+    </div>
+  {% endif %}
 </article>

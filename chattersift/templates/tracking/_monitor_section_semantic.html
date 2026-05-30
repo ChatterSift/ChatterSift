@@ -36,7 +36,7 @@
             hx-target="#dashboard-content"
             hx-swap="outerHTML"
             hx-indicator="#global-loading"
-            class="flex flex-col gap-2.5"
+            class="flex flex-col gap-3.5"
             @keydown.escape="adding = false; newKeyword = ''; newPrompt = ''">
         {% csrf_token %}
         <input type="hidden" name="match_mode" value="{{ mode }}" />
