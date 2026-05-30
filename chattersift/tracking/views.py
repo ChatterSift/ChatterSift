@@ -27,6 +27,7 @@ from .services import build_dashboard_groups
 from .services import build_matches_feed
 from .services import delete_single_monitor
 from .services import delete_subreddit_group
+from .services import dismiss_match
 from .services import get_match_retention_days
 from .services import prune_expired_matches_for_user
 from .services import toggle_subreddit_group
@@ -232,6 +233,16 @@ def matches(request: HttpRequest) -> HttpResponse:
     if request.headers.get("HX-Request"):
         return render(request, "tracking/_matches_content.html", context)
     return render(request, "tracking/matches.html", context)
+
+
+@login_required
+@require_POST
+def match_dismiss(request: HttpRequest, reddit_item_id: str) -> HttpResponse:
+    """Dismiss one Reddit item from the user's matches feed; HTMX removes the row."""
+
+    dismiss_match(user=request.user, reddit_item_id=reddit_item_id)
+    # Empty body so hx-swap="outerHTML" removes the matched row.
+    return HttpResponse(status=200)
 
 
 @login_required

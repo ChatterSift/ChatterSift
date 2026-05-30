@@ -28,4 +28,28 @@
       {% for label in item.monitor_labels %}<span class="cs-match__tag">{{ label }}</span>{% endfor %}
     </div>
   {% endif %}
+  <form class="cs-match__actions"
+        method="post"
+        action="{% url 'tracking:match_dismiss' item.reddit_item_id %}"
+        hx-post="{% url 'tracking:match_dismiss' item.reddit_item_id %}"
+        hx-target="closest .cs-match"
+        hx-swap="outerHTML swap:160ms">
+    {% csrf_token %}
+    <button type="submit"
+            class="cs-match__action"
+            aria-label="{% translate 'Dismiss match' %}"
+            title="{% translate 'Dismiss' %}">
+      <svg xmlns="http://www.w3.org/2000/svg"
+           viewBox="0 0 24 24"
+           fill="none"
+           stroke="currentColor"
+           stroke-width="2"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           aria-hidden="true">
+        <line x1="6" y1="6" x2="18" y2="18" />
+        <line x1="6" y1="18" x2="18" y2="6" />
+      </svg>
+    </button>
+  </form>
 </article>

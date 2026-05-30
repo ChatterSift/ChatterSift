@@ -83,6 +83,32 @@ class Match(models.Model):
         return f"{self.monitor_id}:{self.reddit_item_id}"
 
 
+class MatchDismissal(models.Model):
+    """Records that a user has hidden one Reddit item from their matches feed."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    reddit_item_id = models.CharField(max_length=255)
+    dismissed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-dismissed_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "reddit_item_id"],
+                name="unique_match_dismissal_per_user_item",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["user", "reddit_item_id"],
+                name="tracking_dismissal_lookup_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id}:{self.reddit_item_id}"
+
+
 class MatchRetentionPreference(models.Model):
     """Stores one user's matched-item retention window."""
 

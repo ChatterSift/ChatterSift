@@ -10,12 +10,14 @@ from django.utils import timezone
 from chattersift.alerts.models import EmailMatchDelivery
 from chattersift.reddit.models import RedditItem
 from chattersift.tracking.models import Match
+from chattersift.tracking.models import MatchDismissal
 from chattersift.tracking.models import MatchRetentionPreference
 from chattersift.tracking.models import Monitor
 from chattersift.tracking.services import MonitorAlreadyExistsError
 from chattersift.tracking.services import add_monitor_to_subreddit
 from chattersift.tracking.services import build_dashboard_groups
 from chattersift.tracking.services import build_matches_feed
+from chattersift.tracking.services import dismiss_match
 from chattersift.tracking.services import get_match_retention_days
 from chattersift.tracking.services import prune_expired_matches
 from chattersift.tracking.services import prune_expired_matches_for_user
@@ -135,6 +137,44 @@ def test_build_matches_feed_orders_items_chronologically(user) -> None:
     feed = build_matches_feed(user, subreddit=None)
 
     assert [item.reddit_item_id for item in feed.items] == ["t3_newer", "t3_older"]
+
+
+def test_dismiss_match_hides_item_from_feed_across_all_monitors(user) -> None:
+    """Dismissing one Reddit item drops it from the feed even if multiple monitors caught it."""
+    postgres = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    htmx = Monitor.objects.create(user=user, subreddit="django", keyword="htmx")
+    _create_match(postgres, reddit_item_id="t3_dismissed", body="postgres htmx")
+    _create_match(htmx, reddit_item_id="t3_dismissed", body="postgres htmx")
+    _create_match(postgres, reddit_item_id="t3_kept", body="postgres only")
+
+    dismiss_match(user=user, reddit_item_id="t3_dismissed")
+
+    feed = build_matches_feed(user, subreddit=None)
+    assert [item.reddit_item_id for item in feed.items] == ["t3_kept"]
+
+
+def test_dismiss_match_is_idempotent(user) -> None:
+    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    _create_match(monitor, reddit_item_id="t3_dup", body="postgres")
+
+    dismiss_match(user=user, reddit_item_id="t3_dup")
+    dismiss_match(user=user, reddit_item_id="t3_dup")
+
+    assert MatchDismissal.objects.filter(user=user, reddit_item_id="t3_dup").count() == 1
+
+
+def test_dismiss_match_is_scoped_per_user(user) -> None:
+    """One user's dismissal must not hide the same item from another user's feed."""
+    other_user = UserFactory()
+    monitor_a = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    monitor_b = Monitor.objects.create(user=other_user, subreddit="django", keyword="postgres")
+    _create_match(monitor_a, reddit_item_id="t3_shared", body="postgres")
+    _create_match(monitor_b, reddit_item_id="t3_shared", body="postgres")
+
+    dismiss_match(user=user, reddit_item_id="t3_shared")
+
+    assert build_matches_feed(user, subreddit=None).items == ()
+    assert [item.reddit_item_id for item in build_matches_feed(other_user, subreddit=None).items] == ["t3_shared"]
 
 
 def test_build_matches_feed_excludes_inactive_monitor_matches(user) -> None:

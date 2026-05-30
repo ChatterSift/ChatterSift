@@ -15,6 +15,11 @@ urlpatterns = [
     path("dash/monitors/<str:subreddit>/delete/", views.monitor_delete_group, name="monitor_delete_group"),
     path("dash/monitors/<str:subreddit>/cadence/", views.monitor_update_cadence, name="monitor_update_cadence"),
     path("dash/matches/", views.matches, name="matches"),
+    path(
+        "dash/matches/<str:reddit_item_id>/dismiss/",
+        views.match_dismiss,
+        name="match_dismiss",
+    ),
     path("dash/settings/", views.dashboard_settings, name="dashboard_settings"),
     path("dash/settings/match-retention/", views.match_retention_update, name="match_retention_update"),
 ]

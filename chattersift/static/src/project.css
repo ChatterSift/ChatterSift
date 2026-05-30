@@ -499,6 +499,8 @@ a:hover .brand-sift::after,
   margin-left: auto;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
+  /* Reserve space for the action toolbar so the time doesn't jump on hover. */
+  padding-right: 2.25rem;
 }
 
 .cs-match__time-sep {
@@ -593,6 +595,65 @@ a:hover .brand-sift::after,
   content: "#";
   opacity: 0.55;
   margin-right: 0.0625rem;
+}
+
+/* Row actions: hover-revealed toolbar at top-right. Sits above the stretched
+   .cs-match__link::after overlay (z-index:1) so the buttons capture clicks. */
+.cs-match__actions {
+  position: absolute;
+  top: 0.625rem;
+  right: 0.625rem;
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  margin: 0;
+  padding: 0;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(-1px);
+  transition: opacity 140ms ease, transform 140ms ease;
+  pointer-events: none;
+}
+
+.cs-match:hover .cs-match__actions,
+.cs-match:focus-within .cs-match__actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.cs-match__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.cs-match__action:hover,
+.cs-match__action:focus-visible {
+  background: var(--color-base-100);
+  border-color: color-mix(in oklab, var(--color-error) 35%, transparent);
+  color: var(--color-error);
+  outline: none;
+}
+
+.cs-match__action svg {
+  width: 0.9375rem;
+  height: 0.9375rem;
+}
+
+/* Soft fade-out when HTMX swaps the row away after a successful dismiss. */
+.cs-match.htmx-swapping {
+  opacity: 0;
+  transform: translateX(2px);
+  transition: opacity 160ms ease, transform 160ms ease;
 }
 
 .cs-matches-pager {

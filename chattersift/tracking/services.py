@@ -20,6 +20,7 @@ from chattersift.core.text_snippets import highlighted_snippet
 from chattersift.reddit.contracts import MonitorMatchMode
 
 from .models import Match
+from .models import MatchDismissal
 from .models import MatchRetentionPreference
 from .models import Monitor
 
@@ -452,7 +453,9 @@ def build_matches_feed(
     )
     selected_subreddit = subreddit if subreddit in subreddit_options else None
 
-    group_rows = Match.objects.filter(monitor__user=user, monitor__is_active=True)
+    group_rows = Match.objects.filter(monitor__user=user, monitor__is_active=True).exclude(
+        reddit_item_id__in=MatchDismissal.objects.filter(user=user).values("reddit_item_id"),
+    )
     if selected_subreddit:
         group_rows = group_rows.filter(monitor__subreddit=selected_subreddit)
 
@@ -608,6 +611,12 @@ def _build_dashboard_match(matches: list[Match]) -> DashboardMatch:
         keywords=keywords,
         monitor_labels=monitor_labels,
     )
+
+
+def dismiss_match(*, user: User, reddit_item_id: str) -> None:
+    """Hide one Reddit item from the user's matches feed; idempotent."""
+
+    MatchDismissal.objects.get_or_create(user=user, reddit_item_id=reddit_item_id)
 
 
 def _reddit_item_type_label(reddit_item_id: str) -> str:

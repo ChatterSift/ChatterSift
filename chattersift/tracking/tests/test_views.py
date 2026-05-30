@@ -15,6 +15,7 @@ from chattersift.alerts.models import EmailNotificationPreference
 from chattersift.alerts.models import EmailNotificationSchedule
 from chattersift.alerts.models import NotificationCadence
 from chattersift.tracking.models import Match
+from chattersift.tracking.models import MatchDismissal
 from chattersift.tracking.models import MatchRetentionPreference
 from chattersift.tracking.models import Monitor
 from chattersift.users.tests.factories import UserFactory
@@ -22,7 +23,7 @@ from chattersift.users.tests.factories import UserFactory
 pytestmark = pytest.mark.django_db
 
 EXPECTED_CREATED_MONITOR_COUNT = 2
-EXPECTED_MATCH_BADGE_COUNT = 2
+EXPECTED_MATCH_KEYWORD_TAGS = 2
 DEFAULT_MATCHES_PAGE_SIZE = 25
 RETENTION_NINETY_DAYS = 90
 
@@ -258,8 +259,8 @@ def test_matches_page_shows_matched_content(client, user) -> None:
     content = response.content.decode()
     assert "Django <mark>Postgres</mark> deployment" in content
     assert "https://www.reddit.com/r/django/comments/t3_shared/example/" in content
-    assert '<span class="badge badge-primary badge-outline">r/django</span>' in content
-    assert content.count("badge badge-accent badge-outline") == EXPECTED_MATCH_BADGE_COUNT
+    assert '<span class="cs-match__sub">r/django</span>' in content
+    assert content.count('class="cs-match__tag"') == EXPECTED_MATCH_KEYWORD_TAGS
 
 
 def test_matches_page_labels_posts_and_comments(client, user) -> None:
@@ -271,8 +272,8 @@ def test_matches_page_labels_posts_and_comments(client, user) -> None:
     response = client.get(reverse("tracking:matches"))
 
     content = response.content.decode()
-    assert '<span class="badge badge-info badge-outline">Post</span>' in content
-    assert '<span class="badge badge-info badge-outline">Comment</span>' in content
+    assert 'data-type="post">Post</span>' in content
+    assert 'data-type="comment">Comment</span>' in content
 
 
 def test_matches_page_shows_empty_state(client, user) -> None:
@@ -282,6 +283,35 @@ def test_matches_page_shows_empty_state(client, user) -> None:
     response = client.get(reverse("tracking:matches"))
 
     assert "No matches yet" in response.content.decode()
+
+
+def test_match_dismiss_records_dismissal_and_hides_item(client, user) -> None:
+    """POST to match_dismiss persists a MatchDismissal and removes the item from the feed."""
+    monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    _create_match(monitor, reddit_item_id="t3_hideme", title="Django Postgres deployment")
+    client.force_login(user)
+
+    response = client.post(reverse("tracking:match_dismiss", kwargs={"reddit_item_id": "t3_hideme"}))
+
+    assert response.status_code == HTTPStatus.OK
+    assert MatchDismissal.objects.filter(user=user, reddit_item_id="t3_hideme").exists()
+
+    feed_response = client.get(reverse("tracking:matches"))
+    assert "Django <mark>Postgres</mark> deployment" not in feed_response.content.decode()
+
+
+def test_match_dismiss_requires_login(client) -> None:
+    response = client.post(reverse("tracking:match_dismiss", kwargs={"reddit_item_id": "t3_x"}))
+
+    assert response.status_code == HTTPStatus.FOUND
+
+
+def test_match_dismiss_rejects_get(client, user) -> None:
+    client.force_login(user)
+
+    response = client.get(reverse("tracking:match_dismiss", kwargs={"reddit_item_id": "t3_x"}))
+
+    assert response.status_code == HTTPStatus.METHOD_NOT_ALLOWED
 
 
 def test_matches_page_renders_subreddit_filter_options(client, user) -> None:
