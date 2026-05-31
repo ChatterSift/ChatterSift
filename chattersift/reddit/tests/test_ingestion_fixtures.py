@@ -15,6 +15,7 @@ from chattersift.reddit.models import RedditItem
 from chattersift.reddit.models import SubredditFetchState
 from chattersift.reddit.parsers import parse_reddit_atom_response
 from chattersift.reddit.parsers import parse_reddit_json_response
+from chattersift.reddit.planning import normalize_subreddit
 from chattersift.tracking.models import Match
 from chattersift.tracking.models import Monitor
 from chattersift.users.tests.factories import UserFactory
@@ -130,16 +131,23 @@ def test_fetch_feed_normalize_and_match_ingests_raw_fixture(
         permalink=target_payload.permalink,
         occurred_at=target_payload.occurred_at,
     ).exists()
-    assert result.matched_count >= 1
-    assert Match.objects.filter(
-        monitor=monitor,
-        reddit_item_id=target_payload.reddit_id,
-    ).exists()
+    if spec.kind == RedditFeedKind.POST_STREAM:
+        assert result.matched_count == 0
+        assert not Match.objects.filter(
+            monitor=monitor,
+            reddit_item_id=target_payload.reddit_id,
+        ).exists()
+    else:
+        assert result.matched_count >= 1
+        assert Match.objects.filter(
+            monitor=monitor,
+            reddit_item_id=target_payload.reddit_id,
+        ).exists()
 
     state = SubredditFetchState.objects.get(
         kind=spec.kind,
         format=spec.format,
-        subreddit=spec.subreddit,
+        subreddit=normalize_subreddit(spec.subreddit),
         query_fingerprint=spec.query_fingerprint,
     )
     assert state.consecutive_failures == 0

@@ -15,6 +15,8 @@ from .clients import RedditClient
 from .clients import build_default_reddit_client
 from .contracts import FetchResult
 from .contracts import IngestionResult
+from .contracts import MonitorMatchMode
+from .contracts import RedditFeedKind
 from .matching import KeywordRedditMatcher
 from .matching import SemanticEvaluationProblem
 from .matching import build_match_requests
@@ -27,6 +29,7 @@ from .scheduling import mark_feed_success
 
 if TYPE_CHECKING:
     from .contracts import MatchRequest
+    from .contracts import MonitorIntent
     from .contracts import RedditFeedSpec
     from .matching import RedditMatcher
 
@@ -50,8 +53,7 @@ def fetch_feed_normalize_and_match(
     Output:
         FetchResult for the attempted feed. The implementation owns fetch-state
         success/failure updates. Matching should evaluate normalized content
-        against relevant MonitorIntent rows, regardless of whether the source
-        feed produced posts or comments.
+        against MonitorIntent rows relevant to the feed kind.
     """
     feed_client = client or build_default_reddit_client()
 
@@ -164,7 +166,10 @@ def _upsert_and_match_payloads(
         if did_upsert:
             matchable_payloads.append(payload)
 
-    intents = build_monitor_intents_for_active_monitors()
+    intents = _filter_intents_for_feed(
+        spec,
+        build_monitor_intents_for_active_monitors(),
+    )
     requests = _filter_requests_without_existing_matches(build_match_requests(intents, matchable_payloads))
     semantic_problems: list[SemanticEvaluationProblem] = []
     decisions = evaluate_match_requests(
@@ -186,6 +191,24 @@ def _upsert_and_match_payloads(
         status_code=None,
         last_seen_fullname=last_seen_fullname,
     )
+
+
+def _filter_intents_for_feed(
+    spec: RedditFeedSpec,
+    intents: list[MonitorIntent],
+) -> list[MonitorIntent]:
+    """Return active monitor intents that should be evaluated for this feed kind."""
+    if spec.kind in {RedditFeedKind.POST_SEARCH, RedditFeedKind.COMMENT_SEARCH}:
+        return [
+            intent
+            for intent in intents
+            if intent.match_mode in {MonitorMatchMode.KEYWORD, MonitorMatchMode.KEYWORD_SEMANTIC}
+        ]
+    if spec.kind == RedditFeedKind.POST_STREAM:
+        return [intent for intent in intents if intent.match_mode == MonitorMatchMode.SEMANTIC]
+    if spec.kind == RedditFeedKind.COMMENT_STREAM:
+        return intents
+    return []
 
 
 def _upsert_item(payload) -> tuple[RedditItem, bool]:

@@ -12,6 +12,7 @@ from django.utils import timezone
 from .contracts import RedditFeedFormat
 from .models import SubredditFetchState
 from .planning import build_feed_specs_for_active_monitors
+from .planning import normalize_subreddit
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -53,7 +54,6 @@ def get_due_feed_specs(*, limit: int | None = None) -> list[RedditFeedSpec]:
         for state in SubredditFetchState.objects.filter(
             kind__in={identity.kind for identity in identities},
             format__in={identity.format for identity in identities},
-            subreddit__in={identity.subreddit for identity in identities},
         )
     }
     now = timezone.now()
@@ -170,7 +170,7 @@ def _state_identity(spec: RedditFeedSpec) -> _FeedStateIdentity:
     return _FeedStateIdentity(
         kind=spec.kind,
         format=spec.format,
-        subreddit=spec.subreddit,
+        subreddit=normalize_subreddit(spec.subreddit),
         query_fingerprint=spec.query_fingerprint,
     )
 
@@ -180,6 +180,6 @@ def _state_identity_from_state(state: SubredditFetchState) -> _FeedStateIdentity
     return _FeedStateIdentity(
         kind=cast("str", state.kind),
         format=cast("str", state.format),
-        subreddit=cast("str", state.subreddit),
+        subreddit=normalize_subreddit(cast("str", state.subreddit)),
         query_fingerprint=cast("str", state.query_fingerprint),
     )

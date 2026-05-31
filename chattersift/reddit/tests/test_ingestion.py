@@ -21,12 +21,15 @@ from chattersift.reddit.ingestion import fetch_feed_normalize_and_match
 from chattersift.reddit.matching import RedditMatcher
 from chattersift.reddit.models import RedditItem
 from chattersift.reddit.models import SubredditFetchState
+from chattersift.reddit.services import fetch_normalize_and_match
 from chattersift.tracking.models import Match
 from chattersift.tracking.models import Monitor
 from chattersift.users.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
 SEMANTIC_TEST_CONFIDENCE = 0.9
+COMMENT_STREAM_ALL_MODES_MATCH_COUNT = 3
+COMMENT_STREAM_SEMANTIC_CALL_COUNT = 2
 
 
 class FakeRedditClient(RedditClient):
@@ -228,6 +231,136 @@ def test_fetch_feed_normalize_and_match_does_not_match_comment_context_title() -
     assert result.matched_count == 0
     assert RedditItem.objects.filter(reddit_id="t1_context_only").exists()
     assert not Match.objects.filter(reddit_item_id="t1_context_only").exists()
+
+
+def test_post_search_does_not_evaluate_pure_semantic_monitors() -> None:
+    user = UserFactory()
+    Monitor.objects.create(
+        user=user,
+        subreddit="django",
+        match_mode=MonitorMatchMode.SEMANTIC,
+        keyword="",
+        semantic_description="database outage reports",
+        semantic_fingerprint="semantic",
+    )
+    payload = RedditItemPayload(
+        reddit_id="t3_post_search_semantic_skip",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/post-search-semantic-skip/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Postgres outage",
+        body="A Django deployment hit database problems.",
+    )
+    spec = RedditFeedSpec(
+        kind=RedditFeedKind.POST_SEARCH,
+        format=RedditFeedFormat.JSON,
+        subreddit="django",
+        query='"postgres"',
+        query_fingerprint="post-search-semantic-skip",
+    )
+    matcher = MatchingSemanticMatcher()
+
+    result = fetch_feed_normalize_and_match(
+        spec,
+        client=FakeRedditClient([payload]),
+        semantic_matcher=matcher,
+    )
+
+    assert result.matched_count == 0
+    assert matcher.call_count == 0
+    assert not Match.objects.exists()
+
+
+def test_post_stream_does_not_match_keyword_only_monitors() -> None:
+    user = UserFactory()
+    Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    payload = RedditItemPayload(
+        reddit_id="t3_post_stream_keyword_skip",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/post-stream-keyword-skip/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Postgres with Django",
+        body="A thread about database tuning.",
+    )
+    spec = RedditFeedSpec(
+        kind=RedditFeedKind.POST_STREAM,
+        format=RedditFeedFormat.JSON,
+        subreddit="django",
+    )
+
+    result = fetch_feed_normalize_and_match(spec, client=FakeRedditClient([payload]))
+
+    assert result.matched_count == 0
+    assert not Match.objects.exists()
+
+
+def test_comment_stream_evaluates_all_monitor_modes() -> None:
+    user = UserFactory()
+    keyword_monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    keyword_semantic_monitor = Monitor.objects.create(
+        user=user,
+        subreddit="django",
+        match_mode=MonitorMatchMode.KEYWORD_SEMANTIC,
+        keyword="postgres",
+        semantic_description="database outage reports",
+        semantic_fingerprint="keyword-semantic",
+    )
+    semantic_monitor = Monitor.objects.create(
+        user=user,
+        subreddit="django",
+        match_mode=MonitorMatchMode.SEMANTIC,
+        keyword="",
+        semantic_description="database outage reports",
+        semantic_fingerprint="semantic",
+    )
+    payload = RedditItemPayload(
+        reddit_id="t1_comment_stream_all_modes",
+        item_type=RedditItem.RedditItemType.COMMENT,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/comment-stream-all-modes/example/comment/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Thread context",
+        body="This postgres outage affected a Django deployment.",
+    )
+    spec = RedditFeedSpec(
+        kind=RedditFeedKind.COMMENT_STREAM,
+        format=RedditFeedFormat.RSS,
+        subreddit="django",
+    )
+    matcher = MatchingSemanticMatcher()
+
+    result = fetch_feed_normalize_and_match(
+        spec,
+        client=FakeRedditClient([payload]),
+        semantic_matcher=matcher,
+    )
+
+    assert result.matched_count == COMMENT_STREAM_ALL_MODES_MATCH_COUNT
+    assert matcher.call_count == COMMENT_STREAM_SEMANTIC_CALL_COUNT
+    assert Match.objects.filter(monitor=keyword_monitor, reddit_item_id=payload.reddit_id).exists()
+    assert Match.objects.filter(monitor=keyword_semantic_monitor, reddit_item_id=payload.reddit_id).exists()
+    assert Match.objects.filter(monitor=semantic_monitor, reddit_item_id=payload.reddit_id).exists()
+
+
+def test_fetch_normalize_and_match_uses_post_stream_scoped_matching() -> None:
+    user = UserFactory()
+    Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
+    payload = RedditItemPayload(
+        reddit_id="t3_direct_post_stream_keyword",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/direct-post-stream-keyword/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Postgres with Django",
+        body="A thread about database tuning.",
+    )
+
+    matched_count = fetch_normalize_and_match("r/Django", client=FakeRedditClient([payload]))
+
+    assert matched_count == 0
+    assert not Match.objects.filter(reddit_item_id=payload.reddit_id).exists()
 
 
 def test_keyword_semantic_persists_semantic_match_metadata() -> None:

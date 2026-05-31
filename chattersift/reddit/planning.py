@@ -66,15 +66,13 @@ def build_search_query_groups_for_monitor_intents(
         format.
 
     Output:
-        SearchQueryGroup rows packed by subreddit for efficient search feeds.
-        For RSS keyword matching, planners should produce POST_SEARCH groups
-        only because Reddit does not support comment search through RSS, so
-        comments are collected through COMMENT_STREAM. For JSON keyword
-        matching, planners should produce POST_SEARCH and COMMENT_SEARCH groups.
+        SearchQueryGroup rows packed by subreddit for efficient post search
+        feeds. Keyword comments are collected through COMMENT_STREAM so active
+        monitor planning can share one RSS comment feed per subreddit.
         Semantic-only intents should not produce search groups because
         natural-language descriptions are not reliable Reddit search queries.
     """
-    feed_format = normalize_feed_format(preferred_format)
+    normalize_feed_format(preferred_format)
     grouped_keywords: dict[str, set[str]] = {}  # subreddit -> keywords
 
     for intent in intents:
@@ -105,16 +103,6 @@ def build_search_query_groups_for_monitor_intents(
                 query_fingerprint=fingerprint_query(query),
             ),
         )
-        if feed_format.value == "json":
-            groups.append(
-                SearchQueryGroup(
-                    kind=RedditFeedKind.COMMENT_SEARCH,
-                    subreddit=subreddit,
-                    keywords=keywords,
-                    query=query,
-                    query_fingerprint=fingerprint_query(query),
-                ),
-            )
 
     return groups
 
@@ -131,10 +119,9 @@ def build_feed_specs_for_monitor_intents(
 
     Output:
         RedditFeedSpec rows with no user identity. The required matrix is:
-        KEYWORD + RSS -> POST_SEARCH + COMMENT_STREAM.
-        KEYWORD + JSON -> POST_SEARCH + COMMENT_SEARCH.
-        SEMANTIC + RSS -> POST_STREAM + COMMENT_STREAM.
-        SEMANTIC + JSON -> POST_STREAM + COMMENT_STREAM.
+        KEYWORD or KEYWORD_SEMANTIC -> POST_SEARCH in the preferred format.
+        SEMANTIC -> POST_STREAM in the preferred format.
+        Any active monitor mode -> one COMMENT_STREAM/RSS per subreddit.
     """
     feed_format = normalize_feed_format(preferred_format)
     specs_by_identity: dict[tuple[str, str, str, str], RedditFeedSpec] = {}
@@ -154,7 +141,6 @@ def build_feed_specs_for_monitor_intents(
 
     for subreddit, needs_post_stream, needs_comment_stream in _stream_requirements(
         intents,
-        feed_format,
     ):
         if needs_post_stream:
             spec = RedditFeedSpec(
@@ -166,7 +152,7 @@ def build_feed_specs_for_monitor_intents(
         if needs_comment_stream:
             spec = RedditFeedSpec(
                 kind=RedditFeedKind.COMMENT_STREAM,
-                format=feed_format,
+                format=RedditFeedFormat.RSS,
                 subreddit=subreddit,
             )
             specs_by_identity[_feed_spec_identity(spec)] = spec
@@ -201,8 +187,8 @@ def normalize_feed_format(feed_format: RedditFeedFormat) -> RedditFeedFormat:
 
 
 def normalize_subreddit(value: str) -> str:
-    """Return a stable subreddit token without a user-facing r/ prefix."""
-    return value.strip().removeprefix("/r/").removeprefix("r/").strip()
+    """Return a stable lowercase subreddit token without a user-facing r/ prefix."""
+    return re.sub(r"^/?r/", "", value.strip(), flags=re.IGNORECASE).strip().casefold()
 
 
 def normalize_keyword(value: str) -> str:
@@ -224,7 +210,6 @@ def fingerprint_query(query: str) -> str:
 
 def _stream_requirements(
     intents: list[MonitorIntent],
-    feed_format: RedditFeedFormat,
 ) -> list[tuple[str, bool, bool]]:
     """Summarize per-subreddit post/comment stream requirements from monitor intents."""
     requirements: dict[str, tuple[bool, bool]] = {}
@@ -241,10 +226,7 @@ def _stream_requirements(
         if intent.match_mode == MonitorMatchMode.SEMANTIC:
             needs_post_stream = True
             needs_comment_stream = True
-        elif (
-            intent.match_mode in {MonitorMatchMode.KEYWORD, MonitorMatchMode.KEYWORD_SEMANTIC}
-            and feed_format.value == "rss"
-        ):
+        elif intent.match_mode in {MonitorMatchMode.KEYWORD, MonitorMatchMode.KEYWORD_SEMANTIC}:
             needs_comment_stream = True
 
         requirements[subreddit] = (needs_post_stream, needs_comment_stream)
@@ -259,7 +241,7 @@ def _stream_requirements(
 
 def _feed_spec_identity(spec: RedditFeedSpec) -> tuple[str, str, str, str]:
     """Return the canonical identity tuple used to dedupe feed specifications."""
-    return (spec.kind, spec.format, spec.subreddit.casefold(), spec.query_fingerprint)
+    return (spec.kind, spec.format, normalize_subreddit(spec.subreddit), spec.query_fingerprint)
 
 
 def _quote_query_term(keyword: str) -> str:

@@ -12,6 +12,7 @@ from .contracts import RedditFeedKind
 from .contracts import RedditFeedSpec
 from .ingestion import fetch_feed_normalize_and_match
 from .models import RedditItem
+from .planning import normalize_subreddit
 
 if TYPE_CHECKING:
     from .clients import RedditClient
@@ -28,7 +29,7 @@ def fetch_normalize_and_match(subreddit: str, *, client: RedditClient) -> int:
         RedditFeedSpec(
             kind=RedditFeedKind.POST_STREAM,
             format=RedditFeedFormat.RSS,
-            subreddit=subreddit,
+            subreddit=normalize_subreddit(subreddit),
         ),
         client=client,
     )
