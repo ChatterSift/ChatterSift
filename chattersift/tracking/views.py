@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.http import QueryDict
@@ -12,6 +13,9 @@ from django.views.decorators.http import require_GET
 from django.views.decorators.http import require_POST
 
 from chattersift.alerts.models import NotificationCadence
+from chattersift.core.extension_points import MonitorPolicyError
+from chattersift.core.extension_points import get_dashboard_settings_context
+from chattersift.core.extension_points import get_monitor_policy
 from chattersift.reddit.contracts import MonitorMatchMode
 
 from .forms import MATCH_RETENTION_FOREVER_VALUE
@@ -57,18 +61,22 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 def monitor_create(request: HttpRequest) -> HttpResponse:
     """Creates or reactivates keyword monitors for one subreddit."""
 
-    form = MonitorBatchForm(request.POST)
+    form = MonitorBatchForm(request.POST, user=request.user)
     is_valid = form.is_valid()
     if is_valid:
-        upsert_monitors(
-            user=request.user,
-            subreddit=form.cleaned_data["subreddit"],
-            match_mode=form.cleaned_data["match_mode"],
-            keywords=form.cleaned_data["keywords"],
-            semantic_description=form.cleaned_data["semantic_description"],
-            cadence=form.cleaned_data["cadence"],
-        )
-        form = MonitorBatchForm()
+        try:
+            upsert_monitors(
+                user=request.user,
+                subreddit=form.cleaned_data["subreddit"],
+                match_mode=form.cleaned_data["match_mode"],
+                keywords=form.cleaned_data["keywords"],
+                semantic_description=form.cleaned_data["semantic_description"],
+                cadence=form.cleaned_data["cadence"],
+            )
+        except MonitorPolicyError as error:
+            form.add_error(error.field, str(error))
+        else:
+            form = MonitorBatchForm(user=request.user)
 
     return _render_dashboard_content(request, form=form)
 
@@ -78,7 +86,7 @@ def monitor_create(request: HttpRequest) -> HttpResponse:
 def monitor_add(request: HttpRequest, subreddit: str) -> HttpResponse:
     """Adds one monitor (keyword, semantic, or hybrid) to an existing group."""
 
-    form = MonitorAddForm(request.POST)
+    form = MonitorAddForm(request.POST, user=request.user, subreddit=subreddit.casefold())
     inline_error: dict[str, object] | None = None
     if form.is_valid():
         try:
@@ -96,6 +104,13 @@ def monitor_add(request: HttpRequest, subreddit: str) -> HttpResponse:
                 "match_mode": form.cleaned_data["match_mode"],
                 "message": "A monitor with these settings already exists for this subreddit.",
             }
+        except MonitorPolicyError as error:
+            inline_error = {
+                "kind": "add",
+                "subreddit": subreddit.casefold(),
+                "match_mode": form.cleaned_data["match_mode"],
+                "message": str(error),
+            }
     else:
         inline_error = {
             "kind": "add",
@@ -106,7 +121,7 @@ def monitor_add(request: HttpRequest, subreddit: str) -> HttpResponse:
 
     return _render_dashboard_content(
         request,
-        form=MonitorBatchForm(),
+        form=MonitorBatchForm(user=request.user),
         inline_error=inline_error,
     )
 
@@ -117,7 +132,7 @@ def monitor_edit(request: HttpRequest, pk: int) -> HttpResponse:
     """Edits one monitor's mode and content in place."""
 
     monitor = get_object_or_404(Monitor, pk=pk, user=request.user)
-    form = MonitorEditForm(request.POST)
+    form = MonitorEditForm(request.POST, user=request.user, subreddit=monitor.subreddit, monitor=monitor)
     inline_error: dict[str, object] | None = None
     if form.is_valid():
         try:
@@ -134,6 +149,12 @@ def monitor_edit(request: HttpRequest, pk: int) -> HttpResponse:
                 "monitor_pk": monitor.pk,
                 "message": "A monitor with these settings already exists for this subreddit.",
             }
+        except MonitorPolicyError as error:
+            inline_error = {
+                "kind": "edit",
+                "monitor_pk": monitor.pk,
+                "message": str(error),
+            }
     else:
         inline_error = {
             "kind": "edit",
@@ -143,7 +164,7 @@ def monitor_edit(request: HttpRequest, pk: int) -> HttpResponse:
 
     return _render_dashboard_content(
         request,
-        form=MonitorBatchForm(),
+        form=MonitorBatchForm(user=request.user),
         inline_error=inline_error,
     )
 
@@ -154,7 +175,7 @@ def monitor_delete(request: HttpRequest, pk: int) -> HttpResponse:
     """Permanently deletes one keyword monitor."""
 
     delete_single_monitor(user=request.user, pk=pk)
-    return _render_dashboard_content(request, form=MonitorBatchForm())
+    return _render_dashboard_content(request, form=MonitorBatchForm(user=request.user))
 
 
 @login_required
@@ -167,7 +188,7 @@ def monitor_deactivate(request: HttpRequest, pk: int) -> HttpResponse:
         monitor.is_active = False
         monitor.save(update_fields=["is_active", "updated_at"])
 
-    return _render_dashboard_content(request, form=MonitorBatchForm())
+    return _render_dashboard_content(request, form=MonitorBatchForm(user=request.user))
 
 
 @login_required
@@ -175,8 +196,16 @@ def monitor_deactivate(request: HttpRequest, pk: int) -> HttpResponse:
 def monitor_toggle_group(request: HttpRequest, subreddit: str) -> HttpResponse:
     """Pauses or resumes all monitors for a subreddit."""
 
-    toggle_subreddit_group(user=request.user, subreddit=subreddit)
-    return _render_dashboard_content(request, form=MonitorBatchForm())
+    inline_error: dict[str, object] | None = None
+    try:
+        toggle_subreddit_group(user=request.user, subreddit=subreddit)
+    except MonitorPolicyError as error:
+        inline_error = {
+            "kind": "group",
+            "subreddit": subreddit.casefold(),
+            "message": str(error),
+        }
+    return _render_dashboard_content(request, form=MonitorBatchForm(user=request.user), inline_error=inline_error)
 
 
 @login_required
@@ -185,7 +214,7 @@ def monitor_delete_group(request: HttpRequest, subreddit: str) -> HttpResponse:
     """Permanently deletes all monitors for a subreddit."""
 
     delete_subreddit_group(user=request.user, subreddit=subreddit)
-    return _render_dashboard_content(request, form=MonitorBatchForm())
+    return _render_dashboard_content(request, form=MonitorBatchForm(user=request.user))
 
 
 @login_required
@@ -193,15 +222,33 @@ def monitor_delete_group(request: HttpRequest, subreddit: str) -> HttpResponse:
 def monitor_update_cadence(request: HttpRequest, subreddit: str) -> HttpResponse:
     """Updates notification cadence for all monitors in a subreddit group."""
 
-    form = CadenceForm(request.POST)
+    form = CadenceForm(request.POST, user=request.user, subreddit=subreddit.casefold())
+    inline_error: dict[str, object] | None = None
     if form.is_valid():
-        update_group_cadence(
-            user=request.user,
-            subreddit=subreddit,
-            cadence=form.cleaned_data["cadence"],
-        )
+        try:
+            update_group_cadence(
+                user=request.user,
+                subreddit=subreddit,
+                cadence=form.cleaned_data["cadence"],
+            )
+        except MonitorPolicyError as error:
+            inline_error = {
+                "kind": "cadence",
+                "subreddit": subreddit.casefold(),
+                "message": str(error),
+            }
+    else:
+        inline_error = {
+            "kind": "cadence",
+            "subreddit": subreddit.casefold(),
+            "message": _form_first_error(form),
+        }
 
-    return _render_dashboard_content(request, form=MonitorBatchForm())
+    return _render_dashboard_content(
+        request,
+        form=MonitorBatchForm(user=request.user),
+        inline_error=inline_error,
+    )
 
 
 @login_required
@@ -284,13 +331,23 @@ def _dashboard_context(
 ) -> dict[str, object]:
     """Build the dashboard template context for full-page and partial renders."""
     subreddit_groups = build_dashboard_groups(request.user, include_matches=False)
-    form = form or MonitorBatchForm()
+    form = form or MonitorBatchForm(user=request.user)
+    policy = get_monitor_policy()
+    cadence_choices = policy.filter_cadence_choices(
+        user=request.user,
+        choices=NotificationCadence.choices,
+    )
+    match_mode_choices = policy.filter_match_mode_choices(
+        user=request.user,
+        choices=MonitorMatchMode.choices,
+    )
     return {
         "form": form,
         "show_monitor_form": form.is_bound and bool(form.errors),
         "subreddit_groups": subreddit_groups,
-        "cadence_choices": NotificationCadence.choices,
-        "match_mode_choices": MonitorMatchMode.choices,
+        "cadence_choices": cadence_choices,
+        "match_mode_choices": match_mode_choices,
+        "allowed_match_modes": tuple(value for value, _ in match_mode_choices),
         "inline_error": inline_error,
     }
 
@@ -302,10 +359,13 @@ def _settings_context(
 ) -> dict[str, object]:
     """Build the settings template context for full-page and partial renders."""
 
-    return {
+    context = {
         "dash_active_nav": "settings",
         "match_retention_form": match_retention_form or _match_retention_form(request),
+        "dashboard_settings_extension_template": settings.CHATTERSIFT_DASHBOARD_SETTINGS_EXTENSION_TEMPLATE,
     }
+    context.update(get_dashboard_settings_context(request))
+    return context
 
 
 def _match_retention_form(request: HttpRequest) -> MatchRetentionForm:
@@ -331,7 +391,7 @@ def _render_dashboard_content(
     return HttpResponse(html)
 
 
-def _form_first_error(form: MonitorAddForm | MonitorEditForm) -> str:
+def _form_first_error(form: CadenceForm | MonitorAddForm | MonitorEditForm) -> str:
     """Return the first error message from a bound form for inline display."""
     for errors in form.errors.values():
         if errors:

@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from litellm import completion
 
+from chattersift.core.extension_points import get_semantic_credentials
+
 from .contracts import MatchDecision
 from .contracts import MatchRequest
 from .contracts import MonitorMatchMode
@@ -104,7 +106,8 @@ class SemanticRedditMatcher(RedditMatcher):
         if monitor_id is None:
             missing_monitor_id = "Match requests must include a persisted monitor id."
             raise ValueError(missing_monitor_id)
-        if not settings.CHATTERSIFT_SEMANTIC_LLM_MODEL:
+        credentials = get_semantic_credentials(user_id=request.intent.user_id)
+        if not credentials.model:
             missing_model = "CHATTERSIFT_SEMANTIC_LLM_MODEL is required for semantic matching."
             raise SemanticMatchError(missing_model)
 
@@ -121,7 +124,7 @@ class SemanticRedditMatcher(RedditMatcher):
 
         try:
             response = completion(
-                model=settings.CHATTERSIFT_SEMANTIC_LLM_MODEL,
+                model=credentials.model,
                 messages=[
                     {
                         "role": "system",
@@ -150,8 +153,8 @@ class SemanticRedditMatcher(RedditMatcher):
                 temperature=0,
                 max_tokens=settings.CHATTERSIFT_SEMANTIC_LLM_MAX_TOKENS,
                 timeout=settings.CHATTERSIFT_SEMANTIC_LLM_TIMEOUT_SECONDS,
-                api_base=settings.CHATTERSIFT_SEMANTIC_LLM_BASE_URL or None,
-                api_key=settings.CHATTERSIFT_SEMANTIC_LLM_API_KEY or None,
+                api_base=credentials.base_url or None,
+                api_key=credentials.api_key or None,
             )
         except Exception as error:
             raise SemanticMatchError(str(error)) from error

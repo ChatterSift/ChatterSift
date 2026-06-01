@@ -18,6 +18,9 @@
       </div>
     </div>
   </section>
+  {% if dashboard_settings_extension_template %}
+    {% include dashboard_settings_extension_template %}
+  {% endif %}
   {# Matched items #}
   <section class="card border border-base-300 bg-base-100">
     <div class="card-body">

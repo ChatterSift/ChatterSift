@@ -3,11 +3,13 @@ from __future__ import annotations
 import re
 
 from django import forms
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from chattersift.alerts.models import NotificationCadence
+from chattersift.core.extension_points import MonitorPolicyError
+from chattersift.core.extension_points import get_monitor_policy
+from chattersift.core.extension_points import get_semantic_credentials
 from chattersift.reddit.contracts import MonitorMatchMode
 
 SUBREDDIT_TOKEN_RE = re.compile(r"^[A-Za-z0-9_]+$")
@@ -46,6 +48,19 @@ class MonitorBatchForm(forms.Form):
         initial=NotificationCadence.THIRTY_MINUTES,
         required=False,
     )
+
+    def __init__(self, *args, user=None, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.user = user
+        policy = get_monitor_policy()
+        self.fields["match_mode"].choices = policy.filter_match_mode_choices(
+            user=user,
+            choices=MonitorMatchMode.choices,
+        )
+        self.fields["cadence"].choices = policy.filter_cadence_choices(
+            user=user,
+            choices=NotificationCadence.choices,
+        )
 
     def clean_subreddit(self) -> str:
         raw_subreddit = self.cleaned_data["subreddit"].strip()
@@ -106,6 +121,17 @@ class MonitorBatchForm(forms.Form):
             has_keyword=bool(cleaned_data.get("keywords")),
             semantic_description=cleaned_data.get("semantic_description") or "",
             keyword_field="keywords",
+            user=self.user,
+        )
+        _apply_monitor_policy_validation(
+            self,
+            action="create",
+            user=self.user,
+            subreddit=cleaned_data.get("subreddit") or "",
+            match_mode=cleaned_data.get("match_mode") or MonitorMatchMode.KEYWORD,
+            keywords=cleaned_data.get("keywords") or [],
+            semantic_description=cleaned_data.get("semantic_description") or "",
+            cadence=cleaned_data.get("cadence") or NotificationCadence.THIRTY_MINUTES,
         )
         return cleaned_data
 
@@ -123,6 +149,16 @@ class MonitorAddForm(forms.Form):
         required=False,
         widget=forms.Textarea(attrs={"rows": 3}),
     )
+
+    def __init__(self, *args, user=None, subreddit: str = "", monitor=None, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.subreddit = subreddit
+        self.monitor = monitor
+        self.fields["match_mode"].choices = get_monitor_policy().filter_match_mode_choices(
+            user=user,
+            choices=MonitorMatchMode.choices,
+        )
 
     def clean_keyword(self) -> str:
         keyword = (self.cleaned_data.get("keyword") or "").strip()
@@ -150,6 +186,18 @@ class MonitorAddForm(forms.Form):
             has_keyword=bool(cleaned_data.get("keyword")),
             semantic_description=cleaned_data.get("semantic_description") or "",
             keyword_field="keyword",
+            user=self.user,
+        )
+        _apply_monitor_policy_validation(
+            self,
+            action="edit" if self.monitor is not None else "add",
+            user=self.user,
+            subreddit=self.subreddit,
+            match_mode=cleaned_data.get("match_mode") or MonitorMatchMode.KEYWORD,
+            keywords=[cleaned_data.get("keyword") or ""],
+            semantic_description=cleaned_data.get("semantic_description") or "",
+            cadence=None,
+            monitor=self.monitor,
         )
         return cleaned_data
 
@@ -158,13 +206,14 @@ class MonitorEditForm(MonitorAddForm):
     """Same fields as MonitorAddForm; distinct class for edit-endpoint typing."""
 
 
-def _apply_match_mode_validation(
+def _apply_match_mode_validation(  # noqa: PLR0913
     form: forms.Form,
     *,
     match_mode: str,
     has_keyword: bool,
     semantic_description: str,
     keyword_field: str,
+    user,
 ) -> None:
     """Apply cross-field rules shared by all monitor-intent forms."""
 
@@ -177,17 +226,71 @@ def _apply_match_mode_validation(
                 "semantic_description",
                 ValidationError(_("Describe what should match semantically.")),
             )
-        if not settings.CHATTERSIFT_SEMANTIC_LLM_MODEL:
+        if not get_semantic_credentials(user=user).model:
             form.add_error(
                 "semantic_description",
                 ValidationError(_("Semantic monitoring is not configured yet.")),
             )
 
 
+def _apply_monitor_policy_validation(  # noqa: PLR0913
+    form: forms.Form,
+    *,
+    action: str,
+    user,
+    subreddit: str,
+    match_mode: str,
+    keywords: list[str],
+    semantic_description: str,
+    cadence: str | None,
+    monitor=None,
+) -> None:
+    """Apply extension-provided monitor policy validation to a form."""
+
+    if not user or not subreddit:
+        return
+    try:
+        get_monitor_policy().validate_monitor_intent(
+            action=action,
+            user=user,
+            subreddit=subreddit,
+            match_mode=match_mode,
+            keywords=keywords,
+            semantic_description=semantic_description,
+            cadence=cadence,
+            monitor=monitor,
+        )
+    except MonitorPolicyError as error:
+        form.add_error(error.field, ValidationError(str(error)))
+
+
 class CadenceForm(forms.Form):
     """Validates a notification cadence selection."""
 
     cadence = forms.ChoiceField(choices=NotificationCadence)
+
+    def __init__(self, *args, user=None, subreddit: str = "", **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.subreddit = subreddit
+        self.fields["cadence"].choices = get_monitor_policy().filter_cadence_choices(
+            user=user,
+            choices=NotificationCadence.choices,
+        )
+
+    def clean(self) -> dict[str, object]:
+        cleaned_data = super().clean()
+        _apply_monitor_policy_validation(
+            self,
+            action="cadence",
+            user=self.user,
+            subreddit=self.subreddit,
+            match_mode=MonitorMatchMode.KEYWORD,
+            keywords=[],
+            semantic_description="",
+            cadence=cleaned_data.get("cadence"),
+        )
+        return cleaned_data
 
 
 class MatchRetentionForm(forms.Form):

@@ -113,6 +113,7 @@ def test_build_match_requests_filters_by_subreddit() -> None:
 
 def test_semantic_matcher_parses_litellm_json_response(monkeypatch, settings) -> None:
     settings.CHATTERSIFT_SEMANTIC_LLM_MODEL = "openai/gpt-4o-mini"
+    settings.CHATTERSIFT_SEMANTIC_LLM_API_KEY = "sk-global"
     intent = MonitorIntent(
         subreddit="django",
         keywords=(),
@@ -132,6 +133,7 @@ def test_semantic_matcher_parses_litellm_json_response(monkeypatch, settings) ->
 
     def fake_completion(**kwargs):
         assert kwargs["temperature"] == 0
+        assert kwargs["api_key"] == "sk-global"
         return {"choices": [{"message": {"content": '{"matched": true, "confidence": 0.82, "reason": "incident"}'}}]}
 
     monkeypatch.setattr("chattersift.reddit.matching.completion", fake_completion)

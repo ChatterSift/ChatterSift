@@ -96,6 +96,12 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ------------------------------------------------------------------------------
 CHATTERSIFT_URLCONFS = []
 CHATTERSIFT_HOME_TEMPLATE: str = "pages/home.html"
+CHATTERSIFT_MONITOR_POLICY = "chattersift.core.extension_points.DefaultMonitorPolicy"
+CHATTERSIFT_SEMANTIC_CREDENTIALS_PROVIDER = "chattersift.core.extension_points.default_semantic_credentials_provider"
+CHATTERSIFT_DASHBOARD_SETTINGS_EXTENSION_TEMPLATE = ""
+CHATTERSIFT_DASHBOARD_SETTINGS_CONTEXT_PROVIDER = (
+    "chattersift.core.extension_points.default_dashboard_settings_context_provider"
+)
 CHATTERSIFT_ENABLE_API = env.bool("CHATTERSIFT_ENABLE_API", default=False)
 CHATTERSIFT_SITE_DOMAIN = env("CHATTERSIFT_SITE_DOMAIN", default="localhost")
 CHATTERSIFT_API_ROUTERS = [

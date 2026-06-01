@@ -29,6 +29,7 @@ from chattersift.users.tests.factories import UserFactory
 pytestmark = pytest.mark.django_db
 
 EXPECTED_CREATED_MONITOR_COUNT = 2
+EXPECTED_SELF_HOST_POLICY_MONITOR_COUNT = 3
 DEFAULT_MATCHES_PAGE_SIZE = 25
 SECOND_PAGE_NUMBER = 2
 DEFAULT_MATCH_RETENTION_DAYS = 30
@@ -41,6 +42,17 @@ def test_upsert_keyword_monitors_creates_one_monitor_per_keyword(user) -> None:
     assert (
         Monitor.objects.filter(user=user, subreddit="django", is_active=True).count() == EXPECTED_CREATED_MONITOR_COUNT
     )
+
+
+def test_default_monitor_policy_preserves_self_host_monitor_creation(user) -> None:
+    monitors = upsert_keyword_monitors(
+        user=user,
+        subreddit="Django",
+        keywords=["postgres", "htmx", "celery"],
+        cadence="10m",
+    )
+
+    assert len(monitors) == EXPECTED_SELF_HOST_POLICY_MONITOR_COUNT
 
 
 def test_upsert_keyword_monitors_reactivates_inactive_monitor(user) -> None:

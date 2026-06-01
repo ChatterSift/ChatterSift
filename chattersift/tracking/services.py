@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from chattersift.alerts.models import NotificationCadence
 from chattersift.alerts.schedules import ensure_email_delivery_state
+from chattersift.core.extension_points import get_monitor_policy
 from chattersift.core.text_snippets import highlighted_snippet
 from chattersift.reddit.contracts import MonitorMatchMode
 
@@ -95,6 +96,31 @@ class MatchesFeedResult:
     has_next: bool
 
 
+def _validate_monitor_policy(  # noqa: PLR0913
+    *,
+    action: str,
+    user: User,
+    subreddit: str,
+    match_mode: str,
+    keywords: Iterable[str],
+    semantic_description: str,
+    cadence: str | None,
+    monitor: Monitor | None = None,
+) -> None:
+    """Validate a monitor mutation against the configured extension policy."""
+
+    get_monitor_policy().validate_monitor_intent(
+        action=action,
+        user=user,
+        subreddit=subreddit,
+        match_mode=match_mode,
+        keywords=list(keywords),
+        semantic_description=semantic_description,
+        cadence=cadence,
+        monitor=monitor,
+    )
+
+
 @transaction.atomic
 def upsert_keyword_monitors(
     *,
@@ -107,8 +133,18 @@ def upsert_keyword_monitors(
 
     monitors: list[Monitor] = []
     normalized_subreddit = subreddit.casefold()
+    keyword_list = list(keywords)
+    _validate_monitor_policy(
+        action="create",
+        user=user,
+        subreddit=normalized_subreddit,
+        match_mode=MonitorMatchMode.KEYWORD,
+        keywords=keyword_list,
+        semantic_description="",
+        cadence=cadence,
+    )
 
-    for keyword in keywords:
+    for keyword in keyword_list:
         monitor = (
             Monitor.objects.select_for_update()
             .filter(
@@ -160,6 +196,15 @@ def upsert_monitors(  # noqa: PLR0913
     semantic_fingerprint = semantic_description_fingerprint(normalized_description)
     monitor_keywords = [""] if mode == MonitorMatchMode.SEMANTIC else list(keywords)
     monitors: list[Monitor] = []
+    _validate_monitor_policy(
+        action="create",
+        user=user,
+        subreddit=normalized_subreddit,
+        match_mode=mode,
+        keywords=monitor_keywords,
+        semantic_description=normalized_description,
+        cadence=cadence,
+    )
 
     for keyword in monitor_keywords:
         monitor = (
@@ -237,6 +282,16 @@ def add_monitor_to_subreddit(
     if existing is not None:
         if existing.is_active:
             raise MonitorAlreadyExistsError
+        _validate_monitor_policy(
+            action="reactivate",
+            user=user,
+            subreddit=normalized_subreddit,
+            match_mode=mode,
+            keywords=[effective_keyword],
+            semantic_description=normalized_description,
+            cadence=existing.notification_cadence,
+            monitor=existing,
+        )
         existing.is_active = True
         if mode != MonitorMatchMode.KEYWORD:
             existing.semantic_description = normalized_description
@@ -246,6 +301,15 @@ def add_monitor_to_subreddit(
     # Copy cadence from any existing monitors in this group
     other = Monitor.objects.filter(user=user, subreddit=normalized_subreddit).first()
     cadence = other.notification_cadence if other else NotificationCadence.THIRTY_MINUTES
+    _validate_monitor_policy(
+        action="add",
+        user=user,
+        subreddit=normalized_subreddit,
+        match_mode=mode,
+        keywords=[effective_keyword],
+        semantic_description=normalized_description,
+        cadence=cadence,
+    )
     monitor = Monitor.objects.create(
         user=user,
         subreddit=normalized_subreddit,
@@ -298,6 +362,16 @@ def update_monitor(
     if clash:
         raise MonitorAlreadyExistsError
 
+    _validate_monitor_policy(
+        action="edit",
+        user=user,
+        subreddit=monitor.subreddit,
+        match_mode=mode,
+        keywords=[effective_keyword],
+        semantic_description=normalized_description,
+        cadence=monitor.notification_cadence,
+        monitor=monitor,
+    )
     monitor.match_mode = mode
     monitor.keyword = effective_keyword
     monitor.semantic_description = normalized_description
@@ -340,6 +414,16 @@ def toggle_subreddit_group(*, user: User, subreddit: str) -> bool:
     # If any are active, pause all; otherwise resume all
     any_active = any(m.is_active for m in monitors)
     new_state = not any_active
+    if new_state:
+        _validate_monitor_policy(
+            action="reactivate",
+            user=user,
+            subreddit=normalized,
+            match_mode=MonitorMatchMode.KEYWORD,
+            keywords=[],
+            semantic_description="",
+            cadence=None,
+        )
     Monitor.objects.filter(user=user, subreddit=normalized).update(
         is_active=new_state,
     )
@@ -350,6 +434,15 @@ def toggle_subreddit_group(*, user: User, subreddit: str) -> bool:
 def update_group_cadence(*, user: User, subreddit: str, cadence: str) -> None:
     """Sets the notification cadence for all monitors in a subreddit group."""
 
+    _validate_monitor_policy(
+        action="cadence",
+        user=user,
+        subreddit=subreddit.casefold(),
+        match_mode=MonitorMatchMode.KEYWORD,
+        keywords=[],
+        semantic_description="",
+        cadence=cadence,
+    )
     Monitor.objects.filter(user=user, subreddit=subreddit.casefold()).update(
         notification_cadence=cadence,
     )
