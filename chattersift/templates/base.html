@@ -18,14 +18,6 @@
     <link rel="icon"
           href="{% static 'images/favicons/favicon.ico' %}"
           sizes="any" />
-    <link rel="icon"
-          href="{% static 'images/icon-32.png' %}"
-          type="image/png"
-          sizes="32x32" />
-    <link rel="icon"
-          href="{% static 'images/icon-192.png' %}"
-          type="image/png"
-          sizes="192x192" />
     <link rel="apple-touch-icon"
           href="{% static 'images/apple-touch-icon.png' %}" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -90,8 +82,16 @@
               {% endif %}
             </ul>
           </div>
-          <a class="inline-flex items-center px-2 text-xl text-base-content"
-             href="{% url 'home' %}"><span class="brand">Chatter<span class="brand-sift">Sift</span></span></a>
+          <a class="inline-flex items-center gap-2 px-2 text-xl text-base-content"
+             href="{% url 'home' %}">
+            <img src="{% static 'images/icon-192.png' %}"
+                 width="32"
+                 height="32"
+                 class="w-8 h-8 shrink-0"
+                 alt=""
+                 aria-hidden="true" />
+            <span class="brand">Chatter<span class="brand-sift">Sift</span></span>
+          </a>
         </div>
         <div class="navbar-center hidden lg:flex">
           <ul class="menu menu-horizontal px-1">

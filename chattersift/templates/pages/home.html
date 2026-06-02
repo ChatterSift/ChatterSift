@@ -51,7 +51,15 @@
   <nav class="navbar bg-base-100/85 backdrop-blur-sm sticky top-0 z-50 border-b border-base-300 px-4">
     <div class="navbar-start">
       <a href="{% url 'home' %}"
-         class="inline-flex items-center px-2 text-xl text-base-content"><span class="brand">Chatter<span class="brand-sift">Sift</span></span></a>
+         class="inline-flex items-center gap-2 px-2 text-xl text-base-content">
+        <img src="{% static 'images/icon-192.png' %}"
+             width="32"
+             height="32"
+             class="w-8 h-8 shrink-0"
+             alt=""
+             aria-hidden="true" />
+        <span class="brand">Chatter<span class="brand-sift">Sift</span></span>
+      </a>
     </div>
     <div class="navbar-end gap-1 sm:gap-2">
       <a href="https://chattersift.com"
@@ -254,6 +262,12 @@
   <footer class="border-t border-base-300 bg-base-100">
     <div class="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-base-content/55">
       <div class="flex items-center gap-3">
+        <img src="{% static 'images/icon-192.png' %}"
+             width="24"
+             height="24"
+             class="w-6 h-6 shrink-0"
+             alt=""
+             aria-hidden="true" />
         <span class="brand">Chatter<span class="brand-sift">Sift</span></span>
         <span class="font-mono text-xs text-base-content/40">· MIT</span>
       </div>
