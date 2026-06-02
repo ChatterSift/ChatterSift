@@ -8,7 +8,6 @@ import pytest
 from django.utils import timezone
 
 from chattersift.reddit.models import RedditItem
-from chattersift.reddit.services import prune_unmatched_reddit_items
 from chattersift.tracking.models import Match
 from chattersift.tracking.models import Monitor
 from chattersift.users.tests.factories import UserFactory
@@ -34,7 +33,7 @@ def test_prune_unmatched_reddit_items_deletes_old_cache_rows() -> None:
         occurred_at=old_matched.occurred_at,
     )
 
-    deleted_count = prune_unmatched_reddit_items(retention_days=14)
+    deleted_count = RedditItem.objects.prune_expired(retention_days=14)
 
     assert deleted_count == EXPIRED_REDDIT_ITEM_COUNT
     assert not RedditItem.objects.filter(reddit_id=old_unmatched.reddit_id).exists()
@@ -45,7 +44,7 @@ def test_prune_unmatched_reddit_items_deletes_old_cache_rows() -> None:
 
 def test_prune_unmatched_reddit_items_rejects_negative_retention() -> None:
     with pytest.raises(ValueError, match="retention_days"):
-        prune_unmatched_reddit_items(retention_days=-1)
+        RedditItem.objects.prune_expired(retention_days=-1)
 
 
 def create_reddit_item(reddit_id: str) -> RedditItem:

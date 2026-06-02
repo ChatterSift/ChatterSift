@@ -1,9 +1,16 @@
+from __future__ import annotations
+
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from chattersift.alerts.models import NotificationCadence
 from chattersift.reddit.contracts import MonitorMatchMode
+
+from .querysets import MatchDismissalQuerySet
+from .querysets import MatchQuerySet
+from .querysets import MatchRetentionPreferenceQuerySet
+from .querysets import MonitorQuerySet
 
 
 class Monitor(models.Model):
@@ -25,6 +32,8 @@ class Monitor(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = MonitorQuerySet.as_manager()  # ty: ignore[missing-argument]
 
     class Meta:
         ordering = ["subreddit", "match_mode", "keyword", "semantic_fingerprint"]
@@ -67,6 +76,8 @@ class Match(models.Model):
     occurred_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    objects = MatchQuerySet.as_manager()  # ty: ignore[missing-argument]
+
     class Meta:
         ordering = ["-occurred_at"]
         constraints = [
@@ -89,6 +100,8 @@ class MatchDismissal(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     reddit_item_id = models.CharField(max_length=255)
     dismissed_at = models.DateTimeField(auto_now_add=True)
+
+    objects = MatchDismissalQuerySet.as_manager()  # ty: ignore[missing-argument]
 
     class Meta:
         ordering = ["-dismissed_at"]
@@ -116,6 +129,8 @@ class MatchRetentionPreference(models.Model):
     retention_days = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = MatchRetentionPreferenceQuerySet.as_manager()  # ty: ignore[missing-argument]
 
     class Meta:
         ordering = ["user_id"]

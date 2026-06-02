@@ -1,4 +1,9 @@
+from datetime import timedelta
+
+from django.conf import settings
 from django.db import models
+from django.db import transaction
+from django.utils import timezone
 
 from .contracts import RedditFeedFormat
 from .contracts import RedditFeedKind
@@ -37,6 +42,24 @@ class SubredditFetchState(models.Model):
         return f"{self.kind}/{self.format}:r/{self.subreddit}{suffix}"
 
 
+class RedditItemQuerySet(models.QuerySet):
+    """Interface: own bounded Reddit item cache pruning."""
+
+    @transaction.atomic
+    def prune_expired(self, *, retention_days: int | None = None) -> int:
+        """Delete fetched Reddit items older than the configured cache window."""
+        configured_retention_days = (
+            settings.CHATTERSIFT_REDDIT_ITEM_RETENTION_DAYS if retention_days is None else retention_days
+        )
+        if configured_retention_days < 0:
+            msg = "retention_days must be greater than or equal to zero."
+            raise ValueError(msg)
+
+        cutoff = timezone.now() - timedelta(days=configured_retention_days)
+        deleted_count, _ = self.filter(fetched_at__lt=cutoff).delete()
+        return deleted_count
+
+
 class RedditItem(models.Model):
     class RedditItemType(models.TextChoices):
         POST = "post", "Post"
@@ -51,6 +74,8 @@ class RedditItem(models.Model):
     permalink = models.URLField()
     occurred_at = models.DateTimeField()
     fetched_at = models.DateTimeField(auto_now_add=True)
+
+    objects = RedditItemQuerySet.as_manager()  # ty: ignore[missing-argument]
 
     class Meta:
         ordering = ["-occurred_at"]

@@ -6,8 +6,8 @@ from celery import shared_task
 
 from .clients import build_default_reddit_client
 from .ingestion import fetch_due_feeds
+from .models import RedditItem
 from .services import fetch_normalize_and_match
-from .services import prune_unmatched_reddit_items as prune_unmatched_reddit_items_service
 
 
 @shared_task()
@@ -25,4 +25,4 @@ def fetch_subreddit(subreddit: str) -> int:
 @shared_task()
 def prune_unmatched_reddit_items(retention_days: int | None = None) -> int:
     """Delete old unmatched RedditItem cache rows."""
-    return prune_unmatched_reddit_items_service(retention_days=retention_days)
+    return RedditItem.objects.prune_expired(retention_days=retention_days)

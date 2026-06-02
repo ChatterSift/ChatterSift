@@ -13,17 +13,7 @@ from chattersift.tracking.models import Match
 from chattersift.tracking.models import MatchDismissal
 from chattersift.tracking.models import MatchRetentionPreference
 from chattersift.tracking.models import Monitor
-from chattersift.tracking.services import MonitorAlreadyExistsError
-from chattersift.tracking.services import add_monitor_to_subreddit
-from chattersift.tracking.services import build_dashboard_groups
-from chattersift.tracking.services import build_matches_feed
-from chattersift.tracking.services import dismiss_match
-from chattersift.tracking.services import get_match_retention_days
-from chattersift.tracking.services import prune_expired_matches
-from chattersift.tracking.services import prune_expired_matches_for_user
-from chattersift.tracking.services import update_match_retention_days
-from chattersift.tracking.services import update_monitor
-from chattersift.tracking.services import upsert_keyword_monitors
+from chattersift.tracking.querysets import MonitorAlreadyExistsError
 from chattersift.users.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
@@ -36,7 +26,7 @@ DEFAULT_MATCH_RETENTION_DAYS = 30
 
 
 def test_upsert_keyword_monitors_creates_one_monitor_per_keyword(user) -> None:
-    monitors = upsert_keyword_monitors(user=user, subreddit="Django", keywords=["postgres", "htmx"])
+    monitors = Monitor.objects.upsert_keywords(user=user, subreddit="Django", keywords=["postgres", "htmx"])
 
     assert [monitor.keyword for monitor in monitors] == ["postgres", "htmx"]
     assert (
@@ -45,7 +35,7 @@ def test_upsert_keyword_monitors_creates_one_monitor_per_keyword(user) -> None:
 
 
 def test_default_monitor_policy_preserves_self_host_monitor_creation(user) -> None:
-    monitors = upsert_keyword_monitors(
+    monitors = Monitor.objects.upsert_keywords(
         user=user,
         subreddit="Django",
         keywords=["postgres", "htmx", "celery"],
@@ -58,7 +48,7 @@ def test_default_monitor_policy_preserves_self_host_monitor_creation(user) -> No
 def test_upsert_keyword_monitors_reactivates_inactive_monitor(user) -> None:
     monitor = Monitor.objects.create(user=user, subreddit="django", keyword="Postgres", is_active=False)
 
-    monitors = upsert_keyword_monitors(user=user, subreddit="django", keywords=["postgres"])
+    monitors = Monitor.objects.upsert_keywords(user=user, subreddit="django", keywords=["postgres"])
 
     monitor.refresh_from_db()
     assert monitors == [monitor]
@@ -67,7 +57,7 @@ def test_upsert_keyword_monitors_reactivates_inactive_monitor(user) -> None:
 
 
 def test_upsert_keyword_monitors_handles_duplicate_keywords(user) -> None:
-    upsert_keyword_monitors(user=user, subreddit="django", keywords=["Postgres", "postgres"])
+    Monitor.objects.upsert_keywords(user=user, subreddit="django", keywords=["Postgres", "postgres"])
 
     assert Monitor.objects.count() == 1
     assert Monitor.objects.get().keyword == "Postgres"
@@ -78,7 +68,7 @@ def test_build_dashboard_groups_scopes_monitors_to_user(user) -> None:
     Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
     Monitor.objects.create(user=other_user, subreddit="python", keyword="postgres")
 
-    groups = build_dashboard_groups(user)
+    groups = Monitor.objects.dashboard_groups_for_user(user)
 
     assert [group.subreddit for group in groups] == ["django"]
 
@@ -90,7 +80,7 @@ def test_build_dashboard_groups_aggregates_duplicate_matches_for_same_reddit_ite
     _create_match(postgres, reddit_item_id="t3_shared", title="Django with Postgres", occurred_at=occurred_at)
     _create_match(htmx, reddit_item_id="t3_shared", title="Django with Postgres", occurred_at=occurred_at)
 
-    groups = build_dashboard_groups(user)
+    groups = Monitor.objects.dashboard_groups_for_user(user)
 
     assert len(groups) == 1
     assert len(groups[0].matches) == 1
@@ -103,7 +93,7 @@ def test_build_dashboard_groups_excludes_inactive_monitor_matches(user) -> None:
     _create_match(active_monitor, reddit_item_id="t3_active")
     _create_match(inactive_monitor, reddit_item_id="t3_inactive")
 
-    groups = build_dashboard_groups(user)
+    groups = Monitor.objects.dashboard_groups_for_user(user)
 
     assert [match.reddit_item_id for match in groups[0].matches] == ["t3_active"]
 
@@ -114,7 +104,7 @@ def test_build_matches_feed_returns_user_tracked_subreddit_options(user) -> None
     Monitor.objects.create(user=user, subreddit="python", keyword="fastapi")
     Monitor.objects.create(user=other_user, subreddit="golang", keyword="gin")
 
-    feed = build_matches_feed(user, subreddit=None)
+    feed = Match.objects.feed_for_user(user, subreddit=None)
 
     assert feed.subreddit_options == ("django", "python")
 
@@ -123,7 +113,7 @@ def test_build_matches_feed_unknown_subreddit_resets_to_all(user) -> None:
     monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
     _create_match(monitor, reddit_item_id="t3_django")
 
-    feed = build_matches_feed(user, subreddit="missing")
+    feed = Match.objects.feed_for_user(user, subreddit="missing")
 
     assert feed.selected_subreddit is None
     assert [item.reddit_item_id for item in feed.items] == ["t3_django"]
@@ -135,7 +125,7 @@ def test_build_matches_feed_aggregates_duplicate_matches_for_same_item(user) -> 
     _create_match(postgres, reddit_item_id="t3_shared", title="Postgres + HTMX", body="postgres htmx")
     _create_match(htmx, reddit_item_id="t3_shared", title="Postgres + HTMX", body="postgres htmx")
 
-    feed = build_matches_feed(user, subreddit=None)
+    feed = Match.objects.feed_for_user(user, subreddit=None)
 
     assert len(feed.items) == 1
     assert feed.items[0].keywords == ("htmx", "postgres")
@@ -146,7 +136,7 @@ def test_build_matches_feed_orders_items_chronologically(user) -> None:
     _create_match(monitor, reddit_item_id="t3_older", occurred_at=datetime(2026, 5, 4, tzinfo=UTC))
     _create_match(monitor, reddit_item_id="t3_newer", occurred_at=datetime(2026, 5, 5, tzinfo=UTC))
 
-    feed = build_matches_feed(user, subreddit=None)
+    feed = Match.objects.feed_for_user(user, subreddit=None)
 
     assert [item.reddit_item_id for item in feed.items] == ["t3_newer", "t3_older"]
 
@@ -159,9 +149,9 @@ def test_dismiss_match_hides_item_from_feed_across_all_monitors(user) -> None:
     _create_match(htmx, reddit_item_id="t3_dismissed", body="postgres htmx")
     _create_match(postgres, reddit_item_id="t3_kept", body="postgres only")
 
-    dismiss_match(user=user, reddit_item_id="t3_dismissed")
+    MatchDismissal.objects.dismiss(user=user, reddit_item_id="t3_dismissed")
 
-    feed = build_matches_feed(user, subreddit=None)
+    feed = Match.objects.feed_for_user(user, subreddit=None)
     assert [item.reddit_item_id for item in feed.items] == ["t3_kept"]
 
 
@@ -169,8 +159,8 @@ def test_dismiss_match_is_idempotent(user) -> None:
     monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
     _create_match(monitor, reddit_item_id="t3_dup", body="postgres")
 
-    dismiss_match(user=user, reddit_item_id="t3_dup")
-    dismiss_match(user=user, reddit_item_id="t3_dup")
+    MatchDismissal.objects.dismiss(user=user, reddit_item_id="t3_dup")
+    MatchDismissal.objects.dismiss(user=user, reddit_item_id="t3_dup")
 
     assert MatchDismissal.objects.filter(user=user, reddit_item_id="t3_dup").count() == 1
 
@@ -183,10 +173,12 @@ def test_dismiss_match_is_scoped_per_user(user) -> None:
     _create_match(monitor_a, reddit_item_id="t3_shared", body="postgres")
     _create_match(monitor_b, reddit_item_id="t3_shared", body="postgres")
 
-    dismiss_match(user=user, reddit_item_id="t3_shared")
+    MatchDismissal.objects.dismiss(user=user, reddit_item_id="t3_shared")
 
-    assert build_matches_feed(user, subreddit=None).items == ()
-    assert [item.reddit_item_id for item in build_matches_feed(other_user, subreddit=None).items] == ["t3_shared"]
+    assert Match.objects.feed_for_user(user, subreddit=None).items == ()
+    assert [item.reddit_item_id for item in Match.objects.feed_for_user(other_user, subreddit=None).items] == [
+        "t3_shared",
+    ]
 
 
 def test_build_matches_feed_excludes_inactive_monitor_matches(user) -> None:
@@ -195,7 +187,7 @@ def test_build_matches_feed_excludes_inactive_monitor_matches(user) -> None:
     _create_match(active_monitor, reddit_item_id="t3_active", body="postgres")
     _create_match(inactive_monitor, reddit_item_id="t3_inactive", body="htmx")
 
-    feed = build_matches_feed(user, subreddit=None)
+    feed = Match.objects.feed_for_user(user, subreddit=None)
 
     assert [item.reddit_item_id for item in feed.items] == ["t3_active"]
 
@@ -209,8 +201,8 @@ def test_build_matches_feed_returns_second_page_with_default_page_size(user) -> 
             occurred_at=datetime(2026, 5, 5, 0, index, tzinfo=UTC),
         )
 
-    first_page = build_matches_feed(user, subreddit=None)
-    second_page = build_matches_feed(user, subreddit=None, page=SECOND_PAGE_NUMBER)
+    first_page = Match.objects.feed_for_user(user, subreddit=None)
+    second_page = Match.objects.feed_for_user(user, subreddit=None, page=SECOND_PAGE_NUMBER)
 
     assert len(first_page.items) == DEFAULT_MATCHES_PAGE_SIZE
     assert first_page.has_next
@@ -223,7 +215,7 @@ def test_build_matches_feed_highlights_keywords_case_insensitively(user) -> None
     monitor = Monitor.objects.create(user=user, subreddit="django", keyword="Postgres")
     _create_match(monitor, reddit_item_id="t3_case", title="POSTGRES tips", body="postgres setup")
 
-    feed = build_matches_feed(user, subreddit=None)
+    feed = Match.objects.feed_for_user(user, subreddit=None)
 
     assert "<mark>POSTGRES</mark>" in str(feed.items[0].title_html)
     assert "<mark>postgres</mark>" in str(feed.items[0].body_html)
@@ -235,7 +227,7 @@ def test_build_matches_feed_highlighting_prefers_longer_overlapping_keywords(use
     _create_match(monitor_short, reddit_item_id="t3_overlap", title="postgres", body="postgres")
     _create_match(monitor_long, reddit_item_id="t3_overlap", title="postgres", body="postgres")
 
-    feed = build_matches_feed(user, subreddit=None)
+    feed = Match.objects.feed_for_user(user, subreddit=None)
 
     assert str(feed.items[0].title_html) == "<mark>postgres</mark>"
 
@@ -244,18 +236,18 @@ def test_build_matches_feed_highlighting_escapes_html(user) -> None:
     monitor = Monitor.objects.create(user=user, subreddit="django", keyword="postgres")
     _create_match(monitor, reddit_item_id="t3_escape", title="<script>postgres</script>", body="<b>postgres</b>")
 
-    feed = build_matches_feed(user, subreddit=None)
+    feed = Match.objects.feed_for_user(user, subreddit=None)
 
     assert "&lt;script&gt;<mark>postgres</mark>&lt;/script&gt;" in str(feed.items[0].title_html)
     assert "&lt;b&gt;<mark>postgres</mark>&lt;/b&gt;" in str(feed.items[0].body_html)
 
 
 def test_get_match_retention_days_defaults_missing_preference_to_thirty_days(user) -> None:
-    assert get_match_retention_days(user) == DEFAULT_MATCH_RETENTION_DAYS
+    assert MatchRetentionPreference.objects.get_days_for_user(user) == DEFAULT_MATCH_RETENTION_DAYS
 
 
 def test_update_match_retention_days_persists_keep_forever(user) -> None:
-    preference = update_match_retention_days(user=user, retention_days=None)
+    preference = MatchRetentionPreference.objects.update_days_for_user(user=user, retention_days=None)
 
     assert preference.retention_days is None
     assert MatchRetentionPreference.objects.get(user=user).retention_days is None
@@ -269,7 +261,7 @@ def test_prune_expired_matches_for_user_deletes_by_match_created_at(user) -> Non
     Match.objects.filter(pk=old_match.pk).update(created_at=now - timedelta(days=31))
     Match.objects.filter(pk=fresh_match.pk).update(created_at=now - timedelta(days=29))
 
-    deleted_count = prune_expired_matches_for_user(user=user, now=now)
+    deleted_count = Match.objects.prune_expired_for_user(user=user, now=now)
 
     assert deleted_count == 1
     assert list(Match.objects.values_list("reddit_item_id", flat=True)) == ["t3_fresh"]
@@ -281,7 +273,7 @@ def test_prune_expired_matches_skips_keep_forever(user) -> None:
     Match.objects.filter(pk=match.pk).update(created_at=timezone.now() - timedelta(days=400))
     MatchRetentionPreference.objects.create(user=user, retention_days=None)
 
-    assert prune_expired_matches_for_user(user=user) == 0
+    assert Match.objects.prune_expired_for_user(user=user) == 0
     assert Match.objects.filter(pk=match.pk).exists()
 
 
@@ -294,7 +286,7 @@ def test_prune_expired_matches_isolates_users(user) -> None:
     other_match = _create_match(other_monitor, reddit_item_id="t3_other")
     Match.objects.filter(pk__in=[user_match.pk, other_match.pk]).update(created_at=now - timedelta(days=31))
 
-    deleted_count = prune_expired_matches_for_user(user=user, now=now)
+    deleted_count = Match.objects.prune_expired_for_user(user=user, now=now)
 
     assert deleted_count == 1
     assert Match.objects.filter(pk=other_match.pk).exists()
@@ -316,7 +308,7 @@ def test_prune_expired_matches_preserves_related_monitor_reddit_cache_and_email_
     )
     delivery = EmailMatchDelivery.objects.create(user=user, reddit_item_id="t3_old", sent_at=now)
 
-    deleted_count = prune_expired_matches_for_user(user=user, now=now)
+    deleted_count = Match.objects.prune_expired_for_user(user=user, now=now)
 
     assert deleted_count == 1
     assert Monitor.objects.filter(pk=monitor.pk).exists()
@@ -330,12 +322,12 @@ def test_prune_expired_matches_applies_default_to_users_without_preference(user)
     now = timezone.now()
     Match.objects.filter(pk=match.pk).update(created_at=now - timedelta(days=31))
 
-    assert prune_expired_matches(now=now) == 1
+    assert Match.objects.prune_expired(now=now) == 1
     assert not Match.objects.filter(pk=match.pk).exists()
 
 
 def test_add_monitor_to_subreddit_creates_keyword_monitor(user) -> None:
-    monitor = add_monitor_to_subreddit(
+    monitor = Monitor.objects.add_to_subreddit(
         user=user,
         subreddit="Django",
         match_mode="keyword",
@@ -352,7 +344,7 @@ def test_add_monitor_to_subreddit_creates_keyword_monitor(user) -> None:
 def test_add_monitor_to_subreddit_creates_semantic_monitor(user, settings) -> None:
     settings.CHATTERSIFT_SEMANTIC_LLM_MODEL = "openai/gpt-4o-mini"
 
-    monitor = add_monitor_to_subreddit(
+    monitor = Monitor.objects.add_to_subreddit(
         user=user,
         subreddit="django",
         match_mode="semantic",
@@ -366,7 +358,7 @@ def test_add_monitor_to_subreddit_creates_semantic_monitor(user, settings) -> No
 
 
 def test_add_monitor_to_subreddit_creates_hybrid_monitor(user) -> None:
-    monitor = add_monitor_to_subreddit(
+    monitor = Monitor.objects.add_to_subreddit(
         user=user,
         subreddit="django",
         match_mode="keyword_semantic",
@@ -389,7 +381,7 @@ def test_add_monitor_to_subreddit_reactivates_inactive_duplicate(user) -> None:
         is_active=False,
     )
 
-    monitor = add_monitor_to_subreddit(user=user, subreddit="django", match_mode="keyword", keyword="HTMX")
+    monitor = Monitor.objects.add_to_subreddit(user=user, subreddit="django", match_mode="keyword", keyword="HTMX")
 
     existing.refresh_from_db()
     assert monitor.pk == existing.pk
@@ -400,13 +392,13 @@ def test_add_monitor_to_subreddit_raises_on_active_duplicate(user) -> None:
     Monitor.objects.create(user=user, subreddit="django", match_mode="keyword", keyword="htmx")
 
     with pytest.raises(MonitorAlreadyExistsError):
-        add_monitor_to_subreddit(user=user, subreddit="django", match_mode="keyword", keyword="htmx")
+        Monitor.objects.add_to_subreddit(user=user, subreddit="django", match_mode="keyword", keyword="htmx")
 
 
 def test_update_monitor_renames_keyword(user) -> None:
     monitor = Monitor.objects.create(user=user, subreddit="django", match_mode="keyword", keyword="htmx")
 
-    updated = update_monitor(user=user, pk=monitor.pk, match_mode="keyword", keyword="postgres")
+    updated = Monitor.objects.update_for_user(user=user, pk=monitor.pk, match_mode="keyword", keyword="postgres")
 
     assert updated.pk == monitor.pk
     assert updated.keyword == "postgres"
@@ -421,7 +413,7 @@ def test_update_monitor_changes_semantic_description_refingerprints(user) -> Non
         semantic_fingerprint="oldfp",
     )
 
-    updated = update_monitor(
+    updated = Monitor.objects.update_for_user(
         user=user,
         pk=monitor.pk,
         match_mode="semantic",
@@ -443,7 +435,7 @@ def test_update_monitor_changes_mode_clears_semantic_fields(user) -> None:
         semantic_fingerprint="abc",
     )
 
-    updated = update_monitor(user=user, pk=monitor.pk, match_mode="keyword", keyword="payments")
+    updated = Monitor.objects.update_for_user(user=user, pk=monitor.pk, match_mode="keyword", keyword="payments")
 
     assert updated.match_mode == "keyword"
     assert updated.keyword == "payments"
@@ -456,7 +448,7 @@ def test_update_monitor_raises_on_duplicate_after_edit(user) -> None:
     target = Monitor.objects.create(user=user, subreddit="django", match_mode="keyword", keyword="htmx")
 
     with pytest.raises(MonitorAlreadyExistsError):
-        update_monitor(user=user, pk=target.pk, match_mode="keyword", keyword="postgres")
+        Monitor.objects.update_for_user(user=user, pk=target.pk, match_mode="keyword", keyword="postgres")
 
     target.refresh_from_db()
     assert target.keyword == "htmx"

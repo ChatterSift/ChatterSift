@@ -30,7 +30,7 @@ Direnv is supported via `.envrc`. Keep local secrets in `.env` or `.envrc.local`
 
 ## Coding Style & Naming Conventions
 
-Use 4-space indentation for Python. Keep apps small and domain-focused. Prefer explicit service functions in `services.py` for business logic instead of placing orchestration in views or Celery tasks.
+Use 4-space indentation for Python. Keep apps small and domain-focused. Prefer fat models and thin views. Put model-owned behavior on model methods, and put reusable ORM behavior on custom QuerySets, including filters, transformations, creation, lookup, and factory-style operations. Expose custom QuerySets with `as_manager()` only when Django requires an object manager entry point. Use services sparingly for cross-model orchestration, external integration flows, or complex Celery/task workflows where model placement would be forced.
 
 Use snake_case for modules, functions, fields, and task names. Use PascalCase for Django models, forms, schemas, and class-based views.
 
@@ -58,7 +58,7 @@ The test settings read `DATABASE_URL`; development should use Postgres.
 
 ## Architecture Notes
 
-This is HTMX/server-rendered first. Django Ninja APIs are opt-in via `CHATTERSIFT_ENABLE_API` and should be added only when an API is genuinely required. Extension should happen through Django apps, URLConfs, settings overlays, and explicit service boundaries.
+This is HTMX/server-rendered first. Django Ninja APIs are opt-in via `CHATTERSIFT_ENABLE_API` and should be added only when an API is genuinely required. Extension should happen through Django apps, URLConfs, settings overlays, model APIs, and explicit provider boundaries.
 
 ## Project-Specific Engineering Practices
 - When fixing bugs, add a regression test in the closest test module before merging.

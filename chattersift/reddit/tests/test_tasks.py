@@ -39,19 +39,19 @@ def test_fetch_subreddit_uses_default_client_factory(monkeypatch) -> None:
     assert calls == {"factory": 1, "service": 1}
 
 
-def test_prune_unmatched_reddit_items_delegates_to_service(monkeypatch) -> None:
+def test_prune_unmatched_reddit_items_delegates_to_reddit_item_manager(monkeypatch) -> None:
     expected_result = 4
-    calls = {"service": 0}
+    calls = {"manager": 0}
 
-    def fake_prune_unmatched_reddit_items_service(*, retention_days: int | None = None) -> int:
-        calls["service"] += 1
+    def fake_prune_unmatched_reddit_items(*, retention_days: int | None = None) -> int:
+        calls["manager"] += 1
         assert retention_days == CUSTOM_RETENTION_DAYS
         return expected_result
 
     monkeypatch.setattr(
-        "chattersift.reddit.tasks.prune_unmatched_reddit_items_service",
-        fake_prune_unmatched_reddit_items_service,
+        "chattersift.reddit.tasks.RedditItem.objects.prune_expired",
+        fake_prune_unmatched_reddit_items,
     )
 
     assert prune_unmatched_reddit_items(retention_days=CUSTOM_RETENTION_DAYS) == expected_result
-    assert calls == {"service": 1}
+    assert calls == {"manager": 1}

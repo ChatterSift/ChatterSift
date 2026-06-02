@@ -24,21 +24,11 @@ from .forms import MatchRetentionForm
 from .forms import MonitorAddForm
 from .forms import MonitorBatchForm
 from .forms import MonitorEditForm
+from .models import Match
+from .models import MatchDismissal
+from .models import MatchRetentionPreference
 from .models import Monitor
-from .services import MonitorAlreadyExistsError
-from .services import add_monitor_to_subreddit
-from .services import build_dashboard_groups
-from .services import build_matches_feed
-from .services import delete_single_monitor
-from .services import delete_subreddit_group
-from .services import dismiss_match
-from .services import get_match_retention_days
-from .services import prune_expired_matches_for_user
-from .services import toggle_subreddit_group
-from .services import update_group_cadence
-from .services import update_match_retention_days
-from .services import update_monitor
-from .services import upsert_monitors
+from .querysets import MonitorAlreadyExistsError
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -65,7 +55,7 @@ def monitor_create(request: HttpRequest) -> HttpResponse:
     is_valid = form.is_valid()
     if is_valid:
         try:
-            upsert_monitors(
+            Monitor.objects.upsert_from_intent(
                 user=request.user,
                 subreddit=form.cleaned_data["subreddit"],
                 match_mode=form.cleaned_data["match_mode"],
@@ -90,7 +80,7 @@ def monitor_add(request: HttpRequest, subreddit: str) -> HttpResponse:
     inline_error: dict[str, object] | None = None
     if form.is_valid():
         try:
-            add_monitor_to_subreddit(
+            Monitor.objects.add_to_subreddit(
                 user=request.user,
                 subreddit=subreddit,
                 match_mode=form.cleaned_data["match_mode"],
@@ -136,7 +126,7 @@ def monitor_edit(request: HttpRequest, pk: int) -> HttpResponse:
     inline_error: dict[str, object] | None = None
     if form.is_valid():
         try:
-            update_monitor(
+            Monitor.objects.update_for_user(
                 user=request.user,
                 pk=monitor.pk,
                 match_mode=form.cleaned_data["match_mode"],
@@ -174,7 +164,7 @@ def monitor_edit(request: HttpRequest, pk: int) -> HttpResponse:
 def monitor_delete(request: HttpRequest, pk: int) -> HttpResponse:
     """Permanently deletes one keyword monitor."""
 
-    delete_single_monitor(user=request.user, pk=pk)
+    Monitor.objects.delete_for_user(user=request.user, pk=pk)
     return _render_dashboard_content(request, form=MonitorBatchForm(user=request.user))
 
 
@@ -198,7 +188,7 @@ def monitor_toggle_group(request: HttpRequest, subreddit: str) -> HttpResponse:
 
     inline_error: dict[str, object] | None = None
     try:
-        toggle_subreddit_group(user=request.user, subreddit=subreddit)
+        Monitor.objects.toggle_subreddit_group(user=request.user, subreddit=subreddit)
     except MonitorPolicyError as error:
         inline_error = {
             "kind": "group",
@@ -213,7 +203,7 @@ def monitor_toggle_group(request: HttpRequest, subreddit: str) -> HttpResponse:
 def monitor_delete_group(request: HttpRequest, subreddit: str) -> HttpResponse:
     """Permanently deletes all monitors for a subreddit."""
 
-    delete_subreddit_group(user=request.user, subreddit=subreddit)
+    Monitor.objects.delete_subreddit_group(user=request.user, subreddit=subreddit)
     return _render_dashboard_content(request, form=MonitorBatchForm(user=request.user))
 
 
@@ -226,7 +216,7 @@ def monitor_update_cadence(request: HttpRequest, subreddit: str) -> HttpResponse
     inline_error: dict[str, object] | None = None
     if form.is_valid():
         try:
-            update_group_cadence(
+            Monitor.objects.update_group_cadence(
                 user=request.user,
                 subreddit=subreddit,
                 cadence=form.cleaned_data["cadence"],
@@ -258,7 +248,7 @@ def matches(request: HttpRequest) -> HttpResponse:
 
     selected_subreddit = request.GET.get("subreddit")
     page = _positive_int_or_default(request.GET.get("page"), default=1)
-    feed = build_matches_feed(request.user, subreddit=selected_subreddit, page=page)
+    feed = Match.objects.feed_for_user(request.user, subreddit=selected_subreddit, page=page)
 
     previous_page_url = _matches_query_url(
         subreddit=feed.selected_subreddit,
@@ -293,7 +283,7 @@ def matches(request: HttpRequest) -> HttpResponse:
 def match_dismiss(request: HttpRequest, reddit_item_id: str) -> HttpResponse:
     """Dismiss one Reddit item from the user's matches feed; HTMX removes the row."""
 
-    dismiss_match(user=request.user, reddit_item_id=reddit_item_id)
+    MatchDismissal.objects.dismiss(user=request.user, reddit_item_id=reddit_item_id)
     # Empty body so hx-swap="outerHTML" removes the matched row.
     return HttpResponse(status=200)
 
@@ -316,8 +306,11 @@ def match_retention_update(request: HttpRequest) -> HttpResponse:
 
     form = MatchRetentionForm(request.POST)
     if form.is_valid():
-        update_match_retention_days(user=request.user, retention_days=form.cleaned_data["retention_days"])
-        prune_expired_matches_for_user(user=request.user)
+        MatchRetentionPreference.objects.update_days_for_user(
+            user=request.user,
+            retention_days=form.cleaned_data["retention_days"],
+        )
+        Match.objects.prune_expired_for_user(user=request.user)
         form = _match_retention_form(request)
 
     return render(request, "dash/_settings_content.html", _settings_context(request, match_retention_form=form))
@@ -330,7 +323,7 @@ def _dashboard_context(
     inline_error: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Build the dashboard template context for full-page and partial renders."""
-    subreddit_groups = build_dashboard_groups(request.user, include_matches=False)
+    subreddit_groups = Monitor.objects.dashboard_groups_for_user(request.user, include_matches=False)
     form = form or MonitorBatchForm(user=request.user)
     policy = get_monitor_policy()
     cadence_choices = policy.filter_cadence_choices(
@@ -371,7 +364,7 @@ def _settings_context(
 def _match_retention_form(request: HttpRequest) -> MatchRetentionForm:
     """Return the current user's matched-item retention form."""
 
-    retention_days = get_match_retention_days(request.user)
+    retention_days = MatchRetentionPreference.objects.get_days_for_user(request.user)
     initial = MATCH_RETENTION_FOREVER_VALUE if retention_days is None else str(retention_days)
     return MatchRetentionForm(initial={"retention_days": initial})
 
