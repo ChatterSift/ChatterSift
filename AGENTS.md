@@ -65,6 +65,9 @@ This is HTMX/server-rendered first. Django Ninja APIs are opt-in via `CHATTERSIF
 - Prefer modular code over monolithic code.
 - Prefer explicit behavior over hidden magic.
 - Use existing code style conventions and patterns.
+- Prefer Context7 MCP over web search when looking up library or software
+  documentation, if that library or software has docs available through
+  Context7.
 - All imports must be added on top of the file, NEVER inside the function.
 - Do not swallow exceptions unless the scenario calls for fault tolerance.
 - Always include interface comments. Include certain inline comments when code is less clear.
