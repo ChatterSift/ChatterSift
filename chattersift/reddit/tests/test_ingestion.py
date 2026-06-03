@@ -21,6 +21,8 @@ from chattersift.reddit.ingestion import fetch_feed_normalize_and_match
 from chattersift.reddit.matching import RedditMatcher
 from chattersift.reddit.models import RedditItem
 from chattersift.reddit.models import SubredditFetchState
+from chattersift.reddit.policy import DefaultRedditCollectionPolicy
+from chattersift.reddit.scheduling import get_due_feed_specs
 from chattersift.reddit.services import fetch_normalize_and_match
 from chattersift.tracking.models import Match
 from chattersift.tracking.models import Monitor
@@ -30,6 +32,7 @@ pytestmark = pytest.mark.django_db
 SEMANTIC_TEST_CONFIDENCE = 0.9
 COMMENT_STREAM_ALL_MODES_MATCH_COUNT = 3
 COMMENT_STREAM_SEMANTIC_CALL_COUNT = 2
+PAID_FETCH_OPPORTUNISTIC_MATCH_COUNT = 2
 
 
 class FakeRedditClient(RedditClient):
@@ -74,6 +77,24 @@ class FailingSemanticMatcher(RedditMatcher):
     def evaluate(self, request: MatchRequest) -> MatchDecision:
         msg = "provider unavailable"
         raise RuntimeError(msg)
+
+
+class EmailDomainLanePolicy(DefaultRedditCollectionPolicy):
+    """Test policy that treats paid.test users as paid and others as free."""
+
+    def planning_scope(self, lane: str) -> tuple[str, ...]:
+        """Return one lane for feed planning."""
+        return (lane,)
+
+    def matching_scope(self, lane: str) -> tuple[str, ...]:
+        """Return paid plus free matching for paid fetches."""
+        if lane == "paid":
+            return ("paid", "free")
+        return (lane,)
+
+    def monitor_lane(self, monitor) -> str:
+        """Classify monitors by owner email domain for tests."""
+        return "paid" if monitor.user.email.endswith("@paid.test") else "free"
 
 
 def test_fetch_feed_normalize_and_match_upserts_and_creates_matches() -> None:
@@ -609,6 +630,38 @@ def test_fetch_feed_normalize_and_match_records_failure_state() -> None:
     assert state.next_fetch_at is not None
 
 
+def test_paid_fetch_matches_paid_and_free_monitors_without_free_planning(settings) -> None:
+    settings.CHATTERSIFT_REDDIT_COLLECTION_POLICY = "chattersift.reddit.tests.test_ingestion.EmailDomainLanePolicy"
+    settings.CHATTERSIFT_REDDIT_FEED_FORMAT = "rss"
+    paid_user = UserFactory(email="paid-ingestion@paid.test")
+    free_user = UserFactory(email="free-ingestion@free.test")
+    paid_monitor = Monitor.objects.create(user=paid_user, subreddit="django", keyword="postgres")
+    free_monitor = Monitor.objects.create(user=free_user, subreddit="django", keyword="htmx")
+    payload = RedditItemPayload(
+        reddit_id="t3_paid_fetch_free_match",
+        item_type=RedditItem.RedditItemType.POST,
+        subreddit="django",
+        permalink="https://www.reddit.com/r/django/comments/paid-fetch-free-match/example/",
+        occurred_at=datetime(2026, 5, 5, tzinfo=UTC),
+        title="Postgres and HTMX with Django",
+        body="A thread matching both paid and free monitors.",
+    )
+    search_spec = next(
+        spec for spec in get_due_feed_specs(limit=None, lane="paid") if spec.kind == RedditFeedKind.POST_SEARCH
+    )
+
+    result = fetch_feed_normalize_and_match(
+        search_spec,
+        lane="paid",
+        client=FakeRedditClient([payload]),
+    )
+
+    assert search_spec.query == '"postgres"'
+    assert result.matched_count == PAID_FETCH_OPPORTUNISTIC_MATCH_COUNT
+    assert Match.objects.filter(monitor=paid_monitor, reddit_item_id=payload.reddit_id).exists()
+    assert Match.objects.filter(monitor=free_monitor, reddit_item_id=payload.reddit_id).exists()
+
+
 def test_fetch_due_feeds_uses_default_client_factory(monkeypatch, settings) -> None:
     settings.CHATTERSIFT_REDDIT_FEED_FORMAT = "rss"
     user = UserFactory()
@@ -626,23 +679,34 @@ def test_fetch_due_feeds_uses_default_client_factory(monkeypatch, settings) -> N
             assert spec == expected_spec
             return []
 
-    def fake_get_due_feed_specs(*, limit: int | None = None) -> list[RedditFeedSpec]:
+    def fake_get_due_feed_specs(
+        *,
+        limit: int | None = None,
+        lane: str = "default",
+    ) -> list[RedditFeedSpec]:
         assert limit == 1
+        assert lane == "paid"
         return [expected_spec]
 
     def fake_build_default_reddit_client() -> RedditClient:
         called["factory"] += 1
         return StubClient()
 
-    def fake_mark_feed_success(feed_spec: RedditFeedSpec, result: FetchResult) -> None:
+    def fake_mark_feed_success(
+        feed_spec: RedditFeedSpec,
+        result: FetchResult,
+        *,
+        lane: str = "default",
+    ) -> None:
         assert feed_spec == expected_spec
         assert result.fetched_count == 0
+        assert lane == "paid"
 
     monkeypatch.setattr("chattersift.reddit.ingestion.get_due_feed_specs", fake_get_due_feed_specs)
     monkeypatch.setattr("chattersift.reddit.ingestion.build_default_reddit_client", fake_build_default_reddit_client)
     monkeypatch.setattr("chattersift.reddit.ingestion.mark_feed_success", fake_mark_feed_success)
 
-    result = fetch_due_feeds(limit=1)
+    result = fetch_due_feeds(limit=1, lane="paid")
 
     assert called == {"factory": 1, "fetch": 1}
     assert result.attempted_count == 1
@@ -656,18 +720,24 @@ def test_fetch_due_feeds_logs_failed_feed_attempts(monkeypatch, caplog) -> None:
         subreddit="django",
     )
 
-    def fake_get_due_feed_specs(*, limit: int | None = None) -> list[RedditFeedSpec]:
+    def fake_get_due_feed_specs(
+        *,
+        limit: int | None = None,
+        lane: str = "default",
+    ) -> list[RedditFeedSpec]:
         assert limit is None
+        assert lane == "free"
         return [spec]
 
     monkeypatch.setattr("chattersift.reddit.ingestion.get_due_feed_specs", fake_get_due_feed_specs)
     caplog.set_level(logging.WARNING, logger="chattersift.reddit.ingestion")
 
-    result = fetch_due_feeds(client=FailingRedditClient())
+    result = fetch_due_feeds(client=FailingRedditClient(), lane="free")
 
     assert result.attempted_count == 1
     assert result.failed_count == 1
     assert "Reddit feed fetch failed" in caplog.text
+    assert "lane=free" in caplog.text
     assert "kind=post_stream" in caplog.text
     assert "format=rss" in caplog.text
     assert "subreddit=django" in caplog.text

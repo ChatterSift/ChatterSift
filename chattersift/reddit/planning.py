@@ -11,22 +11,40 @@ from .contracts import RedditFeedFormat
 from .contracts import RedditFeedKind
 from .contracts import RedditFeedSpec
 from .contracts import SearchQueryGroup
+from .policy import DEFAULT_REDDIT_COLLECTION_LANE
+from .policy import get_reddit_collection_policy
 
 
-def build_monitor_intents_for_active_monitors() -> list[MonitorIntent]:
+def build_monitor_intents_for_active_monitors(
+    *,
+    lane: str = DEFAULT_REDDIT_COLLECTION_LANE,
+    scope: str = "planning",
+) -> list[MonitorIntent]:
     """Return normalized user-facing intents from active core monitors.
 
     Input:
-        Active Monitor rows in the public core deployment. The core deployment
-        may contain one or many Django users; user identity belongs to the
-        MonitorIntent, not to feed planning.
+        Active Monitor rows in the configured collection policy scope. The core
+        deployment may contain one or many Django users; user identity belongs
+        to the MonitorIntent, not to feed planning.
 
     Output:
         MonitorIntent rows that preserve ownership while hiding Reddit feed
         mechanics from users.
     """
     intents: list[MonitorIntent] = []
-    active_monitors = Monitor.objects.filter(is_active=True).select_related("user")
+    policy = get_reddit_collection_policy()
+    if scope == "planning":
+        scope_lanes = policy.planning_scope(lane)
+    elif scope == "matching":
+        scope_lanes = policy.matching_scope(lane)
+    else:
+        msg = "scope must be 'planning' or 'matching'."
+        raise ValueError(msg)
+
+    active_monitors = policy.filter_monitors(
+        Monitor.objects.filter(is_active=True).select_related("user"),
+        scope_lanes=scope_lanes,
+    )
     for monitor in active_monitors:
         subreddit = normalize_subreddit(monitor.subreddit)
         keyword = normalize_keyword(monitor.keyword)
@@ -58,12 +76,13 @@ def build_search_query_groups_for_monitor_intents(
     intents: list[MonitorIntent],
     *,
     preferred_format: RedditFeedFormat,
+    max_terms: int | None = None,
 ) -> list[SearchQueryGroup]:
     """Return keyword search groups derived from monitor intents.
 
     Input:
         MonitorIntent rows with keyword terms and preferred Reddit response
-        format.
+        format. ``max_terms`` optionally bounds generated Reddit OR queries.
 
     Output:
         SearchQueryGroup rows packed by subreddit for efficient post search
@@ -73,6 +92,9 @@ def build_search_query_groups_for_monitor_intents(
         natural-language descriptions are not reliable Reddit search queries.
     """
     normalize_feed_format(preferred_format)
+    if max_terms is not None and max_terms < 1:
+        msg = "max_terms must be greater than zero when provided."
+        raise ValueError(msg)
     grouped_keywords: dict[str, set[str]] = {}  # subreddit -> keywords
 
     for intent in intents:
@@ -90,19 +112,20 @@ def build_search_query_groups_for_monitor_intents(
     groups: list[SearchQueryGroup] = []
     for subreddit in sorted(grouped_keywords):
         keywords = tuple(sorted(grouped_keywords[subreddit], key=str.casefold))
-        query = build_reddit_search_query(keywords)
-        if not query:
-            continue
+        for keyword_chunk in _chunk_keywords(keywords, max_terms=max_terms):
+            query = build_reddit_search_query(keyword_chunk)
+            if not query:
+                continue
 
-        groups.append(
-            SearchQueryGroup(
-                kind=RedditFeedKind.POST_SEARCH,
-                subreddit=subreddit,
-                keywords=keywords,
-                query=query,
-                query_fingerprint=fingerprint_query(query),
-            ),
-        )
+            groups.append(
+                SearchQueryGroup(
+                    kind=RedditFeedKind.POST_SEARCH,
+                    subreddit=subreddit,
+                    keywords=keyword_chunk,
+                    query=query,
+                    query_fingerprint=fingerprint_query(query),
+                ),
+            )
 
     return groups
 
@@ -111,6 +134,7 @@ def build_feed_specs_for_monitor_intents(
     intents: list[MonitorIntent],
     *,
     preferred_format: RedditFeedFormat,
+    max_search_terms: int | None = None,
 ) -> list[RedditFeedSpec]:
     """Return internal feed specs required to satisfy monitor intents.
 
@@ -129,6 +153,7 @@ def build_feed_specs_for_monitor_intents(
     for group in build_search_query_groups_for_monitor_intents(
         intents,
         preferred_format=feed_format,
+        max_terms=max_search_terms,
     ):
         spec = RedditFeedSpec(
             kind=group.kind,
@@ -163,6 +188,7 @@ def build_feed_specs_for_monitor_intents(
 def build_feed_specs_for_active_monitors(
     *,
     preferred_format: RedditFeedFormat,
+    lane: str = DEFAULT_REDDIT_COLLECTION_LANE,
 ) -> list[RedditFeedSpec]:
     """Return internal feed specs planned from active core monitors.
 
@@ -174,10 +200,12 @@ def build_feed_specs_for_active_monitors(
         combining as a multi-user feature, but feed specs still omit user
         identity so duplicate work can be reduced within one deployment.
     """
-    intents = build_monitor_intents_for_active_monitors()
+    policy = get_reddit_collection_policy()
+    intents = build_monitor_intents_for_active_monitors(lane=lane, scope="planning")
     return build_feed_specs_for_monitor_intents(
         intents,
         preferred_format=preferred_format,
+        max_search_terms=policy.search_query_max_terms(lane),
     )
 
 
@@ -242,6 +270,17 @@ def _stream_requirements(
 def _feed_spec_identity(spec: RedditFeedSpec) -> tuple[str, str, str, str]:
     """Return the canonical identity tuple used to dedupe feed specifications."""
     return (spec.kind, spec.format, normalize_subreddit(spec.subreddit), spec.query_fingerprint)
+
+
+def _chunk_keywords(
+    keywords: tuple[str, ...],
+    *,
+    max_terms: int | None,
+) -> list[tuple[str, ...]]:
+    """Return deterministic keyword chunks for Reddit search query generation."""
+    if max_terms is None:
+        return [keywords]
+    return [keywords[index : index + max_terms] for index in range(0, len(keywords), max_terms)]
 
 
 def _quote_query_term(keyword: str) -> str:

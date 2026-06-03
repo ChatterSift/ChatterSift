@@ -1,15 +1,45 @@
 from __future__ import annotations
 
 from chattersift.reddit.clients import RedditClient
+from chattersift.reddit.contracts import IngestionResult
+from chattersift.reddit.tasks import fetch_due_reddit_feeds
 from chattersift.reddit.tasks import fetch_subreddit
 from chattersift.reddit.tasks import prune_unmatched_reddit_items
 
 CUSTOM_RETENTION_DAYS = 7
+FREE_TEST_LIMIT = 5
 
 
 class StubClient(RedditClient):
     def fetch_feed(self, spec):  # pragma: no cover
         return []
+
+
+def test_fetch_due_reddit_feeds_passes_lane_and_limit(monkeypatch) -> None:
+    expected = IngestionResult(
+        attempted_count=1,
+        succeeded_count=1,
+        failed_count=0,
+        fetched_count=2,
+        cached_count=2,
+        matched_count=1,
+    )
+
+    def fake_fetch_due_feeds(*, limit: int | None = None, lane: str = "default") -> IngestionResult:
+        assert limit == FREE_TEST_LIMIT
+        assert lane == "free"
+        return expected
+
+    monkeypatch.setattr("chattersift.reddit.tasks.fetch_due_feeds", fake_fetch_due_feeds)
+
+    assert fetch_due_reddit_feeds(limit=FREE_TEST_LIMIT, lane="free") == {
+        "attempted_count": 1,
+        "succeeded_count": 1,
+        "failed_count": 0,
+        "fetched_count": 2,
+        "cached_count": 2,
+        "matched_count": 1,
+    }
 
 
 def test_fetch_subreddit_uses_default_client_factory(monkeypatch) -> None:

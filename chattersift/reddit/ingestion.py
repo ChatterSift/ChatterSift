@@ -23,6 +23,7 @@ from .matching import build_match_requests
 from .matching import evaluate_match_requests
 from .models import RedditItem
 from .planning import build_monitor_intents_for_active_monitors
+from .policy import DEFAULT_REDDIT_COLLECTION_LANE
 from .scheduling import get_due_feed_specs
 from .scheduling import mark_feed_failure
 from .scheduling import mark_feed_success
@@ -41,6 +42,7 @@ ADMIN_TUPLE_LENGTH = 2
 def fetch_feed_normalize_and_match(
     spec: RedditFeedSpec,
     *,
+    lane: str = DEFAULT_REDDIT_COLLECTION_LANE,
     client: RedditClient | None = None,
     keyword_matcher: RedditMatcher | None = None,
     semantic_matcher: RedditMatcher | None = None,
@@ -53,7 +55,8 @@ def fetch_feed_normalize_and_match(
     Output:
         FetchResult for the attempted feed. The implementation owns fetch-state
         success/failure updates. Matching should evaluate normalized content
-        against MonitorIntent rows relevant to the feed kind.
+        against MonitorIntent rows relevant to the feed kind and collection
+        lane.
     """
     feed_client = client or build_default_reddit_client()
 
@@ -62,14 +65,15 @@ def fetch_feed_normalize_and_match(
         result = _upsert_and_match_payloads(
             spec,
             payloads,
+            lane=lane,
             keyword_matcher=keyword_matcher,
             semantic_matcher=semantic_matcher,
         )
     except Exception as error:
-        mark_feed_failure(spec, error)
+        mark_feed_failure(spec, error, lane=lane)
         raise
 
-    mark_feed_success(spec, result)
+    mark_feed_success(spec, result, lane=lane)
     return result
 
 
@@ -79,12 +83,13 @@ def fetch_due_feeds(
     keyword_matcher: RedditMatcher | None = None,
     semantic_matcher: RedditMatcher | None = None,
     limit: int | None = None,
+    lane: str = DEFAULT_REDDIT_COLLECTION_LANE,
 ) -> IngestionResult:
     """Fetch due feeds using the public core scheduler and state model.
 
     Input:
-        Optional client override, optional matcher overrides, and optional feed
-        limit.
+        Optional client override, optional matcher overrides, optional feed
+        limit, and collection lane.
 
     Output:
         Aggregate IngestionResult for all attempted due feeds. This is the main
@@ -97,19 +102,25 @@ def fetch_due_feeds(
     fetched_count = 0
     cached_count = 0
     matched_count = 0
+    due_specs = get_due_feed_specs(limit=limit, lane=lane)
 
-    for spec in get_due_feed_specs(limit=limit):
+    for spec in due_specs:
         attempted_count += 1
         try:
             result = fetch_feed_normalize_and_match(
                 spec,
+                lane=lane,
                 client=client,
                 keyword_matcher=keyword_matcher,
                 semantic_matcher=semantic_matcher,
             )
         except Exception as error:  # noqa: BLE001
             logger.warning(
-                "Reddit feed fetch failed; kind=%s format=%s subreddit=%s query_fingerprint=%s error_type=%s error=%s",
+                (
+                    "Reddit feed fetch failed; lane=%s kind=%s format=%s subreddit=%s "
+                    "query_fingerprint=%s error_type=%s error=%s"
+                ),
+                lane,
                 spec.kind,
                 spec.format,
                 spec.subreddit,
@@ -126,6 +137,17 @@ def fetch_due_feeds(
         cached_count += result.cached_count
         matched_count += result.matched_count
 
+    logger.info(
+        (
+            "Reddit feed ingestion finished; lane=%s planned_feed_count=%s "
+            "attempted_count=%s failed_count=%s matched_count=%s"
+        ),
+        lane,
+        len(due_specs),
+        attempted_count,
+        failed_count,
+        matched_count,
+    )
     return IngestionResult(
         attempted_count=attempted_count,
         succeeded_count=succeeded_count,
@@ -141,6 +163,7 @@ def _upsert_and_match_payloads(
     spec: RedditFeedSpec,
     payloads: list,
     *,
+    lane: str,
     keyword_matcher: RedditMatcher | None,
     semantic_matcher: RedditMatcher | None,
 ) -> FetchResult:
@@ -168,7 +191,7 @@ def _upsert_and_match_payloads(
 
     intents = _filter_intents_for_feed(
         spec,
-        build_monitor_intents_for_active_monitors(),
+        build_monitor_intents_for_active_monitors(lane=lane, scope="matching"),
     )
     requests = _filter_requests_without_existing_matches(build_match_requests(intents, matchable_payloads))
     semantic_problems: list[SemanticEvaluationProblem] = []

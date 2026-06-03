@@ -9,10 +9,29 @@ from chattersift.reddit.contracts import RedditFeedKind
 from chattersift.reddit.planning import build_feed_specs_for_monitor_intents
 from chattersift.reddit.planning import build_monitor_intents_for_active_monitors
 from chattersift.reddit.planning import build_search_query_groups_for_monitor_intents
+from chattersift.reddit.policy import DefaultRedditCollectionPolicy
 from chattersift.tracking.models import Monitor
 from chattersift.users.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
+
+
+class EmailDomainLanePolicy(DefaultRedditCollectionPolicy):
+    """Test policy that treats paid.test users as paid and others as free."""
+
+    def planning_scope(self, lane: str) -> tuple[str, ...]:
+        """Return one lane for feed planning."""
+        return (lane,)
+
+    def matching_scope(self, lane: str) -> tuple[str, ...]:
+        """Return paid plus free matching for paid fetches."""
+        if lane == "paid":
+            return ("paid", "free")
+        return (lane,)
+
+    def monitor_lane(self, monitor) -> str:
+        """Classify monitors by owner email domain for tests."""
+        return "paid" if monitor.user.email.endswith("@paid.test") else "free"
 
 
 def test_build_monitor_intents_for_active_monitors() -> None:
@@ -146,6 +165,47 @@ def test_build_search_query_groups_do_not_include_semantic_intents() -> None:
         RedditFeedKind.POST_SEARCH,
     ]
     assert all(group.query == '"postgres"' for group in groups)
+
+
+def test_active_monitor_intents_use_collection_planning_scope(settings) -> None:
+    settings.CHATTERSIFT_REDDIT_COLLECTION_POLICY = "chattersift.reddit.tests.test_planning.EmailDomainLanePolicy"
+    paid_user = UserFactory(email="paid@paid.test")
+    free_user = UserFactory(email="free@free.test")
+    paid_monitor = Monitor.objects.create(user=paid_user, subreddit="django", keyword="paid")
+    Monitor.objects.create(user=free_user, subreddit="django", keyword="free")
+
+    intents = build_monitor_intents_for_active_monitors(lane="paid", scope="planning")
+
+    assert [intent.monitor_id for intent in intents] == [paid_monitor.pk]
+
+
+def test_paid_matching_scope_includes_free_monitor_intents(settings) -> None:
+    settings.CHATTERSIFT_REDDIT_COLLECTION_POLICY = "chattersift.reddit.tests.test_planning.EmailDomainLanePolicy"
+    paid_user = UserFactory(email="paid-match@paid.test")
+    free_user = UserFactory(email="free-match@free.test")
+    paid_monitor = Monitor.objects.create(user=paid_user, subreddit="django", keyword="paid")
+    free_monitor = Monitor.objects.create(user=free_user, subreddit="django", keyword="free")
+
+    intents = build_monitor_intents_for_active_monitors(lane="paid", scope="matching")
+
+    assert {intent.monitor_id for intent in intents} == {paid_monitor.pk, free_monitor.pk}
+
+
+def test_search_query_chunking_splits_keyword_sets_deterministically() -> None:
+    intents = [
+        MonitorIntent(subreddit="django", keywords=("zulu",), monitor_id=1),
+        MonitorIntent(subreddit="django", keywords=("alpha",), monitor_id=2),
+        MonitorIntent(subreddit="django", keywords=("bravo",), monitor_id=3),
+    ]
+
+    groups = build_search_query_groups_for_monitor_intents(
+        intents,
+        preferred_format=RedditFeedFormat.RSS,
+        max_terms=2,
+    )
+
+    assert [group.keywords for group in groups] == [("alpha", "bravo"), ("zulu",)]
+    assert [group.query for group in groups] == ['"alpha" OR "bravo"', '"zulu"']
 
 
 def test_keyword_semantic_intents_use_keyword_search_specs() -> None:

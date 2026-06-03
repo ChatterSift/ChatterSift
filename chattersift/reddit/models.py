@@ -10,6 +10,7 @@ from .contracts import RedditFeedKind
 
 
 class SubredditFetchState(models.Model):
+    lane = models.CharField(max_length=32, default="default")
     kind = models.CharField(max_length=32, choices=RedditFeedKind)
     format = models.CharField(max_length=16, choices=RedditFeedFormat)
     subreddit = models.CharField(max_length=100)
@@ -23,23 +24,23 @@ class SubredditFetchState(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["subreddit", "kind", "format", "query_fingerprint"]
+        ordering = ["lane", "subreddit", "kind", "format", "query_fingerprint"]
         constraints = [
             models.UniqueConstraint(
-                fields=["kind", "format", "subreddit", "query_fingerprint"],
+                fields=["lane", "kind", "format", "subreddit", "query_fingerprint"],
                 name="unique_reddit_fetch_state_feed",
             ),
         ]
         indexes = [
             models.Index(
-                fields=["kind", "format", "subreddit"],
+                fields=["lane", "kind", "format", "subreddit"],
                 name="reddit_subr_kind_eb52e6_idx",
             ),
         ]
 
     def __str__(self) -> str:
         suffix = f":{self.query_fingerprint}" if self.query_fingerprint else ""
-        return f"{self.kind}/{self.format}:r/{self.subreddit}{suffix}"
+        return f"{self.lane}:{self.kind}/{self.format}:r/{self.subreddit}{suffix}"
 
 
 class RedditItemQuerySet(models.QuerySet):

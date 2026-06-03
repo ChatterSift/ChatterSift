@@ -7,13 +7,17 @@ from celery import shared_task
 from .clients import build_default_reddit_client
 from .ingestion import fetch_due_feeds
 from .models import RedditItem
+from .policy import DEFAULT_REDDIT_COLLECTION_LANE
 from .services import fetch_normalize_and_match
 
 
 @shared_task()
-def fetch_due_reddit_feeds(limit: int | None = None) -> dict:
+def fetch_due_reddit_feeds(
+    limit: int | None = None,
+    lane: str = DEFAULT_REDDIT_COLLECTION_LANE,
+) -> dict:
     """Fetch currently due Reddit feeds through the synchronous core pipeline."""
-    return asdict(fetch_due_feeds(limit=limit))
+    return asdict(fetch_due_feeds(limit=limit, lane=lane))
 
 
 @shared_task()

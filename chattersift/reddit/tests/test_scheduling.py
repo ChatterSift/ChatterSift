@@ -1,16 +1,32 @@
 from __future__ import annotations
 
 import pytest
+from django.utils import timezone
 
 from chattersift.reddit.contracts import FetchResult
 from chattersift.reddit.contracts import RedditFeedFormat
 from chattersift.reddit.contracts import RedditFeedKind
+from chattersift.reddit.contracts import RedditFeedSpec
+from chattersift.reddit.models import SubredditFetchState
+from chattersift.reddit.policy import DefaultRedditCollectionPolicy
 from chattersift.reddit.scheduling import get_due_feed_specs
 from chattersift.reddit.scheduling import mark_feed_success
 from chattersift.tracking.models import Monitor
 from chattersift.users.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
+
+FREE_FETCH_SECONDS = 3600
+
+
+class FreeHourlyLanePolicy(DefaultRedditCollectionPolicy):
+    """Test policy that gives the free lane an hourly fetch interval."""
+
+    def fetch_interval_seconds(self, lane: str) -> int:
+        """Return one hour for free lane success scheduling."""
+        if lane == "free":
+            return FREE_FETCH_SECONDS
+        return super().fetch_interval_seconds(lane)
 
 
 def test_get_due_feed_specs_returns_unseen_planned_specs(settings) -> None:
@@ -116,3 +132,54 @@ def test_comment_stream_success_suppresses_only_comment_stream(settings) -> None
         (RedditFeedKind.POST_SEARCH, RedditFeedFormat.JSON),
         (RedditFeedKind.POST_STREAM, RedditFeedFormat.JSON),
     ]
+
+
+def test_paid_and_free_fetch_state_rows_are_independent() -> None:
+    spec = RedditFeedSpec(
+        kind=RedditFeedKind.POST_SEARCH,
+        format=RedditFeedFormat.RSS,
+        subreddit="django",
+        query='"postgres"',
+        query_fingerprint="same-query",
+    )
+    result = FetchResult(
+        spec=spec,
+        fetched_count=1,
+        cached_count=1,
+        matched_count=0,
+        skipped_count=0,
+        status_code=None,
+        last_seen_fullname="t3_latest",
+    )
+
+    mark_feed_success(spec, result, lane="paid")
+    mark_feed_success(spec, result, lane="free")
+
+    assert set(SubredditFetchState.objects.values_list("lane", flat=True)) == {"paid", "free"}
+
+
+def test_free_success_schedules_next_fetch_about_one_hour_later(settings) -> None:
+    settings.CHATTERSIFT_REDDIT_COLLECTION_POLICY = "chattersift.reddit.tests.test_scheduling.FreeHourlyLanePolicy"
+    spec = RedditFeedSpec(
+        kind=RedditFeedKind.POST_STREAM,
+        format=RedditFeedFormat.RSS,
+        subreddit="django",
+    )
+    started_at = timezone.now()
+
+    mark_feed_success(
+        spec,
+        FetchResult(
+            spec=spec,
+            fetched_count=1,
+            cached_count=1,
+            matched_count=0,
+            skipped_count=0,
+            status_code=None,
+        ),
+        lane="free",
+    )
+
+    state = SubredditFetchState.objects.get(lane="free", subreddit="django")
+    assert state.next_fetch_at is not None
+    assert FREE_FETCH_SECONDS <= (state.next_fetch_at - started_at).total_seconds() <= FREE_FETCH_SECONDS + 5
