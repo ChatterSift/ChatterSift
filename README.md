@@ -1,18 +1,25 @@
-# chattersift
+# ChatterSift — Open-source Reddit monitoring
 
 > Before going further, take 30 seconds to head to **[chattersift.com](https://chattersift.com)** and register a free account to see if it's useful to you. The hosted SaaS is the fastest way to find out — self-hosting is documented below if you'd rather run it yourself.
 
-Keywords monitoring for Reddit.
+**Reddit monitoring** for keywords and topics you care about — open source and self-hostable.
 
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+![ChatterSift matches view — Reddit posts and comments matching your keyword monitors](docs/images/matches.png)
 
-License: MIT
+ChatterSift is an open-source Reddit monitoring app: define keyword monitors across subreddits and get matching posts and comments delivered as alerts. Built as a Django app, HTMX/server-rendered first.
 
-Chattersift is a Django app that watches Reddit for keywords across user-defined monitors and delivers matches as alerts. It is HTMX/server-rendered first. See [docs/deployment.md](docs/deployment.md) for the full deployment reference.
+## Features
+
+- **Keyword matching** — exact phrases, word boundaries, or regex across post titles, bodies, and comments, with negative filters to kill false positives.
+- **Multi-subreddit monitoring** — one monitor configuration covers every community on its list. Scale from five subreddits to five hundred without rewriting a rule.
+- **Instant email alerts** — matches delivered to your inbox within minutes. Per-keyword rate limits keep things usable.
+- **Your data, your control** — use the hosted SaaS or self-host the open source. Either way, your keywords and match history stay in your stack.
+- **Background processing** — Celery workers with retries and back-pressure. The monitor doesn't sleep, and alerts don't pile up.
+- **Open source, MIT-licensed** — read it, fork it, extend it. No lock-in.
 
 ## Self-Hosted Deployment
 
-Chattersift is designed to run on a single VPS with Docker Compose. Caddy terminates HTTPS, Postgres and Redis run as internal services on named volumes, and migrations run automatically before Django and Celery start.
+ChatterSift is designed to run on a single VPS with Docker Compose. Caddy terminates HTTPS, Postgres and Redis run as internal services on named volumes, and migrations run automatically before Django and Celery start.
 
 ### Requirements
 
