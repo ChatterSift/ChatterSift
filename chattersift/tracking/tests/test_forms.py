@@ -6,6 +6,7 @@ from chattersift.tracking.forms import MatchRetentionForm
 from chattersift.tracking.forms import MonitorAddForm
 from chattersift.tracking.forms import MonitorBatchForm
 from chattersift.tracking.forms import MonitorEditForm
+from chattersift.tracking.forms import normalize_subreddit
 
 
 def test_monitor_batch_form_normalizes_subreddit_prefix() -> None:
@@ -21,6 +22,10 @@ def test_monitor_batch_form_rejects_unsafe_subreddit_tokens() -> None:
 
     assert not form.is_valid()
     assert "subreddit" in form.errors
+
+
+def test_normalize_subreddit_matches_batch_form_rules() -> None:
+    assert normalize_subreddit("/r/Django") == "django"
 
 
 def test_monitor_batch_form_rejects_empty_keywords() -> None:

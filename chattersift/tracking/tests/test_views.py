@@ -410,6 +410,36 @@ def test_monitor_add_creates_keyword_monitor(client, user) -> None:
     assert Monitor.objects.filter(user=user, subreddit="django", keyword="htmx").exists()
 
 
+def test_monitor_add_normalizes_url_subreddit(client, user) -> None:
+    Monitor.objects.create(user=user, subreddit="django", match_mode="keyword", keyword="postgres")
+    client.force_login(user)
+
+    response = client.post(
+        reverse("tracking:monitor_add", kwargs={"subreddit": "Django"}),
+        {"match_mode": "keyword", "keyword": "htmx"},
+        HTTP_HX_REQUEST="true",
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert Monitor.objects.filter(user=user, subreddit="django", keyword="htmx").exists()
+    assert not Monitor.objects.filter(user=user, subreddit="Django").exists()
+
+
+def test_monitor_add_rejects_invalid_url_subreddit(client, user) -> None:
+    Monitor.objects.create(user=user, subreddit="django.bad", match_mode="keyword", keyword="postgres")
+    client.force_login(user)
+
+    response = client.post(
+        reverse("tracking:monitor_add", kwargs={"subreddit": "django.bad"}),
+        {"match_mode": "keyword", "keyword": "htmx"},
+        HTTP_HX_REQUEST="true",
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert Monitor.objects.filter(user=user, subreddit="django.bad").count() == 1
+    assert "Use only letters, numbers, and underscores." in response.content.decode()
+
+
 def test_monitor_add_creates_semantic_monitor(client, user, settings) -> None:
     settings.CHATTERSIFT_SEMANTIC_LLM_MODEL = "openai/gpt-4o-mini"
     Monitor.objects.create(user=user, subreddit="django", match_mode="keyword", keyword="postgres")

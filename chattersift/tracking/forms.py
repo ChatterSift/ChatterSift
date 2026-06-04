@@ -63,21 +63,7 @@ class MonitorBatchForm(forms.Form):
         )
 
     def clean_subreddit(self) -> str:
-        raw_subreddit = self.cleaned_data["subreddit"].strip()
-        subreddit = raw_subreddit.removeprefix("/").removeprefix("r/").removeprefix("R/")
-
-        if not subreddit:
-            raise ValidationError(_("Enter a subreddit."))
-        if not SUBREDDIT_TOKEN_RE.fullmatch(subreddit):
-            raise ValidationError(_("Use only letters, numbers, and underscores."))
-
-        if len(subreddit) > SUBREDDIT_MAX_LENGTH:
-            raise ValidationError(
-                _("Subreddit names must be %(limit_value)d characters or fewer."),
-                params={"limit_value": SUBREDDIT_MAX_LENGTH},
-            )
-
-        return subreddit.casefold()
+        return normalize_subreddit(self.cleaned_data["subreddit"])
 
     def clean_keywords(self) -> list[str]:
         raw_keywords = self.cleaned_data.get("keywords") or ""
@@ -204,6 +190,25 @@ class MonitorAddForm(forms.Form):
 
 class MonitorEditForm(MonitorAddForm):
     """Same fields as MonitorAddForm; distinct class for edit-endpoint typing."""
+
+
+def normalize_subreddit(raw_subreddit: str) -> str:
+    """Interface: normalize user- or URL-provided subreddit tokens for Monitor writes."""
+
+    subreddit = raw_subreddit.strip().removeprefix("/").removeprefix("r/").removeprefix("R/")
+
+    if not subreddit:
+        raise ValidationError(_("Enter a subreddit."))
+    if not SUBREDDIT_TOKEN_RE.fullmatch(subreddit):
+        raise ValidationError(_("Use only letters, numbers, and underscores."))
+
+    if len(subreddit) > SUBREDDIT_MAX_LENGTH:
+        raise ValidationError(
+            _("Subreddit names must be %(limit_value)d characters or fewer."),
+            params={"limit_value": SUBREDDIT_MAX_LENGTH},
+        )
+
+    return subreddit.casefold()
 
 
 def _apply_match_mode_validation(  # noqa: PLR0913

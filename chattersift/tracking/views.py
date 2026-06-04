@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.http import QueryDict
 from django.shortcuts import get_object_or_404
@@ -24,6 +25,7 @@ from .forms import MatchRetentionForm
 from .forms import MonitorAddForm
 from .forms import MonitorBatchForm
 from .forms import MonitorEditForm
+from .forms import normalize_subreddit
 from .models import Match
 from .models import MatchDismissal
 from .models import MatchRetentionPreference
@@ -76,13 +78,28 @@ def monitor_create(request: HttpRequest) -> HttpResponse:
 def monitor_add(request: HttpRequest, subreddit: str) -> HttpResponse:
     """Adds one monitor (keyword, semantic, or hybrid) to an existing group."""
 
-    form = MonitorAddForm(request.POST, user=request.user, subreddit=subreddit.casefold())
+    try:
+        normalized_subreddit = normalize_subreddit(subreddit)
+    except ValidationError as error:
+        inline_error = {
+            "kind": "add",
+            "subreddit": subreddit.casefold(),
+            "match_mode": request.POST.get("match_mode") or "",
+            "message": _validation_first_error(error),
+        }
+        return _render_dashboard_content(
+            request,
+            form=MonitorBatchForm(user=request.user),
+            inline_error=inline_error,
+        )
+
+    form = MonitorAddForm(request.POST, user=request.user, subreddit=normalized_subreddit)
     inline_error: dict[str, object] | None = None
     if form.is_valid():
         try:
             Monitor.objects.add_to_subreddit(
                 user=request.user,
-                subreddit=subreddit,
+                subreddit=normalized_subreddit,
                 match_mode=form.cleaned_data["match_mode"],
                 keyword=form.cleaned_data["keyword"],
                 semantic_description=form.cleaned_data["semantic_description"],
@@ -90,21 +107,21 @@ def monitor_add(request: HttpRequest, subreddit: str) -> HttpResponse:
         except MonitorAlreadyExistsError:
             inline_error = {
                 "kind": "add",
-                "subreddit": subreddit.casefold(),
+                "subreddit": normalized_subreddit,
                 "match_mode": form.cleaned_data["match_mode"],
                 "message": "A monitor with these settings already exists for this subreddit.",
             }
         except MonitorPolicyError as error:
             inline_error = {
                 "kind": "add",
-                "subreddit": subreddit.casefold(),
+                "subreddit": normalized_subreddit,
                 "match_mode": form.cleaned_data["match_mode"],
                 "message": str(error),
             }
     else:
         inline_error = {
             "kind": "add",
-            "subreddit": subreddit.casefold(),
+            "subreddit": normalized_subreddit,
             "match_mode": form.cleaned_data.get("match_mode") or "",
             "message": _form_first_error(form),
         }
@@ -389,6 +406,13 @@ def _form_first_error(form: CadenceForm | MonitorAddForm | MonitorEditForm) -> s
     for errors in form.errors.values():
         if errors:
             return str(errors[0])
+    return "Invalid input."
+
+
+def _validation_first_error(error: ValidationError) -> str:
+    """Return the first message from a standalone validation error."""
+    if error.messages:
+        return str(error.messages[0])
     return "Invalid input."
 
 
