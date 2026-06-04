@@ -25,6 +25,7 @@ ChatterSift is designed to run on a single VPS with Docker Compose. Caddy termin
 
 You only need these on the VPS itself — everything else (Python, Node, Postgres, Redis) runs inside containers.
 
+- **VPS** with at least **2 GB RAM** and **15 GB disk** (Postgres, Redis, Django, Celery worker, Celery beat, and Caddy all run on the same host).
 - **GNU Make**
 - **Docker** with the Compose v2 plugin (`docker compose`, not `docker-compose`)
 - **Python 3** — stdlib only, used by `scripts/bootstrap-deploy-env`

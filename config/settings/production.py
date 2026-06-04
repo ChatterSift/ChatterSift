@@ -161,6 +161,25 @@ ANYMAIL_EMAIL_BACKENDS = {
     "mailjet": "anymail.backends.mailjet.EmailBackend",
     "mailersend": "anymail.backends.mailersend.EmailBackend",
 }
+
+
+def amazon_ses_client_params() -> dict[str, object]:
+    """Interface: return Anymail SES client params from deployment env vars."""
+
+    params = env.json("ANYMAIL_AMAZON_SES_CLIENT_PARAMS", default={})
+    if not isinstance(params, dict):
+        message = "ANYMAIL_AMAZON_SES_CLIENT_PARAMS must be a JSON object."
+        raise TypeError(message)
+
+    region_name = env(
+        "ANYMAIL_AMAZON_SES_REGION_NAME",
+        default=env("AWS_REGION", default=env("AWS_DEFAULT_REGION", default="")),
+    )
+    if region_name:
+        return {**params, "region_name": region_name}
+    return params
+
+
 if EMAIL_PROVIDER == "smtp":
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = env("EMAIL_HOST", default="")
@@ -174,7 +193,7 @@ elif EMAIL_PROVIDER in ANYMAIL_EMAIL_BACKENDS:
     INSTALLED_APPS += ["anymail"]
     EMAIL_BACKEND = ANYMAIL_EMAIL_BACKENDS[EMAIL_PROVIDER]
     ANYMAIL = {
-        "AMAZON_SES_CLIENT_PARAMS": env.json("ANYMAIL_AMAZON_SES_CLIENT_PARAMS", default={}),
+        "AMAZON_SES_CLIENT_PARAMS": amazon_ses_client_params(),
         "MAILGUN_API_KEY": env("ANYMAIL_MAILGUN_API_KEY", default=""),
         "MAILGUN_SENDER_DOMAIN": env("ANYMAIL_MAILGUN_SENDER_DOMAIN", default=""),
         "POSTMARK_SERVER_TOKEN": env("ANYMAIL_POSTMARK_SERVER_TOKEN", default=""),

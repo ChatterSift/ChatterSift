@@ -100,8 +100,10 @@ Amazon SES uses Anymail's SES backend:
 
 ```dotenv
 CHATTERSIFT_EMAIL_PROVIDER=amazon_ses
-ANYMAIL_AMAZON_SES_CLIENT_PARAMS={"region_name":"us-east-1"}
+ANYMAIL_AMAZON_SES_REGION_NAME=us-east-1
 ```
+
+`ANYMAIL_AMAZON_SES_CLIENT_PARAMS` remains available for advanced boto3 client options that need a JSON object.
 
 SendGrid is not a first-tier provider because current Anymail support warns that official support was dropped. Use SMTP for SendGrid unless a dedicated integration is added later.
 

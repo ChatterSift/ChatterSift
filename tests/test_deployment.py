@@ -57,6 +57,34 @@ def test_production_postmark_email_provider(monkeypatch):
     assert settings_module.ANYMAIL["POSTMARK_SERVER_TOKEN"] == provider_token
 
 
+def test_production_amazon_ses_email_provider_uses_region_env(monkeypatch):
+    settings_module = _import_production_settings(
+        monkeypatch,
+        CHATTERSIFT_SITE_DOMAIN="deploy.example.com",
+        CHATTERSIFT_EMAIL_PROVIDER="amazon_ses",
+        ANYMAIL_AMAZON_SES_REGION_NAME="us-east-2",
+    )
+
+    assert settings_module.EMAIL_BACKEND == "anymail.backends.amazon_ses.EmailBackend"
+    assert "anymail" in settings_module.INSTALLED_APPS
+    assert settings_module.ANYMAIL["AMAZON_SES_CLIENT_PARAMS"] == {"region_name": "us-east-2"}
+
+
+def test_production_amazon_ses_email_provider_preserves_json_client_params(monkeypatch):
+    settings_module = _import_production_settings(
+        monkeypatch,
+        CHATTERSIFT_SITE_DOMAIN="deploy.example.com",
+        CHATTERSIFT_EMAIL_PROVIDER="amazon_ses",
+        ANYMAIL_AMAZON_SES_CLIENT_PARAMS='{"endpoint_url":"https://email.us-east-2.amazonaws.com"}',
+        ANYMAIL_AMAZON_SES_REGION_NAME="us-east-2",
+    )
+
+    assert settings_module.ANYMAIL["AMAZON_SES_CLIENT_PARAMS"] == {
+        "endpoint_url": "https://email.us-east-2.amazonaws.com",
+        "region_name": "us-east-2",
+    }
+
+
 def test_production_rejects_unknown_email_provider(monkeypatch):
     with pytest.raises(ValueError, match="CHATTERSIFT_EMAIL_PROVIDER"):
         _import_production_settings(
