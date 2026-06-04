@@ -1,6 +1,7 @@
 import importlib
 import sys
 from http import HTTPStatus
+from pathlib import Path
 
 import pytest
 from django.contrib.sites.models import Site
@@ -41,6 +42,24 @@ def test_production_defaults_use_site_domain(monkeypatch):
     ]
     assert settings_module.DEFAULT_FROM_EMAIL == "Chattersift <noreply@deploy.example.com>"
     assert settings_module.COMPRESS_ENABLED is False
+    assert settings_module.ACCOUNT_ALLOW_REGISTRATION is False
+
+
+def test_production_registration_override_allows_signup(monkeypatch):
+    settings_module = _import_production_settings(
+        monkeypatch,
+        CHATTERSIFT_SITE_DOMAIN="deploy.example.com",
+        CHATTERSIFT_EMAIL_PROVIDER="smtp",
+        DJANGO_ACCOUNT_ALLOW_REGISTRATION="True",
+    )
+
+    assert settings_module.ACCOUNT_ALLOW_REGISTRATION is True
+
+
+def test_production_env_example_disables_registration_by_default():
+    env_example = Path(".env.production.example").read_text()
+
+    assert "DJANGO_ACCOUNT_ALLOW_REGISTRATION=False" in env_example
 
 
 def test_production_postmark_email_provider(monkeypatch):

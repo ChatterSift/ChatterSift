@@ -151,6 +151,10 @@ ACCOUNT_EMAIL_SUBJECT_PREFIX = EMAIL_SUBJECT_PREFIX
 # Django Admin URL regex.
 ADMIN_URL = env("DJANGO_ADMIN_URL")
 
+# django-allauth
+# ------------------------------------------------------------------------------
+ACCOUNT_ALLOW_REGISTRATION = env.bool("DJANGO_ACCOUNT_ALLOW_REGISTRATION", default=False)
+
 EMAIL_PROVIDER = env("CHATTERSIFT_EMAIL_PROVIDER", default="smtp")
 ANYMAIL_EMAIL_BACKENDS = {
     "amazon_ses": "anymail.backends.amazon_ses.EmailBackend",
