@@ -21,7 +21,7 @@ dependencies = [
   "celery==5.6.3",
   "collectfasta==3.3.3",
   "django>=5.2.14,<5.3",
-  "django-allauth[mfa]==65.16.1",
+  "django-allauth[mfa]==65.17.0",
   "django-anymail[amazon-ses]==15.0",
   "django-celery-beat==2.9.0",
   "django-compressor==4.6.0",
@@ -36,20 +36,20 @@ dependencies = [
   "hiredis==3.3.1",
   "httpx==0.28.1",
   "litellm==1.84.0",
-  "lxml==6.1.0",
+  "lxml==6.1.1",
   "pillow==12.2.0",
   "psycopg[binary]==3.3.4",
   "python-slugify==8.0.4",
   "redis==7.4.0",
   "sentry-sdk==2.60.0",
-  "uvicorn[standard]==0.47.0",
+  "uvicorn[standard]==0.48.0",
   "uvicorn-worker==0.4.0",
   "whitenoise==6.12.0",
 ]
 
 [dependency-groups]
 dev = [
-  "coverage==7.14.0",
+  "coverage==7.14.1",
   "django-browser-reload>=1.21.0",
   "django-coverage-plugin==3.2.2",
   "django-debug-toolbar==6.3.0",
@@ -62,10 +62,10 @@ dev = [
   "pytest==9.0.3",
   "pytest-django==4.12.0",
   "pytest-sugar==1.1.1",
-  "ruff==0.15.13",
-  "ty>=0.0.36",
+  "ruff==0.15.14",
+  "ty>=0.0.40",
   "types-lxml==2026.2.16",
-  "watchfiles==1.1.1",
+  "watchfiles==1.2.0",
   "werkzeug[watchdog]==3.1.8",
 ]
 
